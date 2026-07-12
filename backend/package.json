@@ -1,0 +1,20 @@
+{
+  "name": "investment-research-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.js"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.2",
+    "@langchain/langgraph": "^1.4.7",
+    "@langchain/openai": "^1.5.5",
+    "axios": "^1.18.1",
+    "express": "^4.19.0",
+    "technicalindicators": "^3.1.0",
+    "tsx": "^4.20.0",
+    "yahoo-finance2": "^4.0.0",
+    "zod": "^4.4.3"
+  }
+}
