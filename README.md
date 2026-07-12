@@ -1,117 +1,88 @@
 # AI Investment Research Agent
 
+**Live demo:** frontend → `https://aiinvestmentapp.netlify.app` · backend → `https://ai-investment-app-pbgo.onrender.com`
+*(Backend runs on Render's free tier, which spins down after inactivity — the first request after idle time can take 30-50s to cold-start. Retry once if the first search seems to hang.)*
+
 ## Overview
 
-Give it a public company name or ticker and it streams back a research report: live financials and technicals from Yahoo Finance, an AI-synthesized read on news sentiment and competitive position, and a deterministic INVEST/PASS verdict with a supporting memo. It uses real financial data from Yahoo Finance, deterministic scoring, and AI-powered synthesis — not six LLM calls asking GPT to guess numbers. The pipeline makes exactly two LLM calls per run, both constrained to a Zod schema, and every non-LLM step is a pure, reproducible function you could unit test without a network connection.
+Give it a public company name or ticker and it streams back a research report: live financials and technicals pulled from Yahoo Finance, an AI-synthesized read on news sentiment and competitive position, and a deterministic INVEST/PASS verdict with a supporting memo — bull case, bear case, entry/target/stop prices, and reasoning.
 
-## Demo
+The core idea: **the verdict is math, not a guess.** The pipeline makes exactly two LLM calls per run — one to interpret news/competitive data, one to write prose around an already-computed score — and both are constrained to a Zod schema so the model can't return something the app doesn't expect. Everything financial (growth, valuation, leverage scoring, the final 0-100 verdict) is a deterministic function in plain code: same inputs always produce the same decision, and none of it depends on an LLM getting arithmetic right.
 
-![Demo screenshot placeholder](docs/demo.png)
-*(Add a screenshot or a short screen recording of a real run here — e.g. searching "NVIDIA" through to a completed report. A GIF showing the pipeline timeline animate through its four steps sells the architecture better than any paragraph of this README.)*
+## How to Run It
 
-## Architecture
-
-```mermaid
-flowchart LR
-    subgraph Node1["1 · fetchData (no LLM)"]
-        direction TB
-        Y1[Yahoo · profile]
-        Y2[Yahoo · financials]
-        Y3[Yahoo · price history]
-        Y4[NewsAPI · articles]
-        Y5[technicalindicators · SMA/RSI/MACD]
-    end
-
-    Node1 -->|profile, financials,<br/>candles, news, technicals| Node2["2 · synthesize (LLM #1)"]
-    Node2 -->|sentiment, competitive<br/>position, risk factors| Node3["3 · score (no LLM)"]
-    Node3 -->|decision, confidence,<br/>score breakdown| Node4["4 · narrate (LLM #2)"]
-    Node4 -->|bull/bear case, memo,<br/>entry/target/stop| Out[ResearchReport]
-
-    style Node1 fill:#0d1117,stroke:#3fb950,color:#e6edf3
-    style Node2 fill:#0d1117,stroke:#d29922,color:#e6edf3
-    style Node3 fill:#0d1117,stroke:#3fb950,color:#e6edf3
-    style Node4 fill:#0d1117,stroke:#d29922,color:#e6edf3
-```
-
-Node 1 fires all five data sources in parallel via `Promise.allSettled` — one provider going down doesn't take out the others, and each success/failure is tracked as a named data source (`yahoo-profile`, `yahoo-financials`, `yahoo-history`, `newsapi`, `technicalindicators`) so the UI can show "3/5 data sources" instead of silently returning a degraded report. Deliberate separation: **math in code, reasoning in LLM.** Node 3's scoring is a pure weighted-sum function over the fetched financials and Node 2's synthesis — same inputs always produce the same decision and confidence. The LLM in Node 4 is handed that decision as a fixed fact and only explains *why*; its schema has no field that could override it.
-
-Progress streams to the browser as NDJSON — one `{step, status, ...}` line per pipeline event — so the frontend can show a live timeline instead of a blank spinner for the ~15-30s a full run takes.
-
-## Key Design Decisions
-
-**Two LLM calls, not six.** Everything that's arithmetic — P/E scoring, growth normalization, the weighted verdict — is deterministic code (`lib/scoring.ts`). The LLM is only asked for things that genuinely require language understanding: reading news articles for sentiment, and writing prose around an already-computed number. Fewer calls means lower latency, lower cost, and a decision that doesn't drift between runs on identical data.
-
-**Deterministic scoring engine.** Six weighted dimensions (growth 25%, valuation 20%, leverage 15%, sentiment 10%, risk 20%, competition 10%) combine into a 0-100 score; ≥60 is INVEST. Every dimension function is pure and independently testable — `scoreGrowth(financials)` doesn't know an LLM exists. This is what makes "same data → same score" true, and it's what a backtester (see below) could actually validate against historical returns.
-
-**Real data sources, not memorized facts.** Yahoo Finance is queried live for profile, financials, and one year of daily candles; NewsAPI supplies actual recent articles. The synthesis prompt is explicitly told not to recall facts from memory — only to interpret the data handed to it — because an LLM asked to "tell me about Company X" will happily hallucinate a plausible-sounding but wrong P/E ratio.
-
-**Zod validation on all LLM output.** Both LLM calls go through `withStructuredOutput()` against a Zod schema (`lib/schemas.ts`), so a malformed or off-spec response fails validation rather than silently corrupting the report — `structuredCall()` retries on that failure the same as a 5xx.
-
-**NDJSON streaming.** The route calls the four pipeline nodes directly rather than invoking a compiled LangGraph, specifically so it can emit a `running` chunk the instant a step starts, not just after it finishes — that's what lets the timeline UI show a live spinner instead of jumping straight to "done."
-
-**Graceful degradation, end to end:**
-- Ticker resolution failure (fake/unknown company) → hard stop before any LLM call, exact error surfaced (`Could not find ticker for X...`) — the pipeline never proceeds to synthesize on data that doesn't exist.
-- Any of the 5 data fetches failing → `Promise.allSettled` isolates it; the report renders with a documented gap instead of failing the whole request.
-- Missing `NEWSAPI_KEY` → news step returns `[]`, sentiment defaults to neutral, nothing throws.
-- LLM call failing → 2 retries with exponential backoff on retryable errors (429/500/502/503), then falls back to neutral synthesis defaults (score) or an unembellished verdict with empty prose (narrate) — the run still completes.
-
-## How to Run
+The whole app lives in `frontend/` (a self-contained Next.js app — its own `/api/research` route runs the full pipeline, no separate server required locally):
 
 ```bash
 git clone https://github.com/mavishsiraj/AI_Investment_app.git
 cd AI_Investment_app/frontend
 npm install
 cp .env.example .env.local
-# edit .env.local — set GROQ_API_KEY (required) and NEWSAPI_KEY (optional)
+# edit .env.local:
 npm run dev
 ```
 
-Open `http://localhost:3000`. The Next.js app is self-contained — its own `/api/research` route runs the full pipeline, so no separate server is required for local dev.
+Then open `http://localhost:3000`.
 
-> There's also a standalone Express server in `backend/` running the identical pipeline on port 4000. It exists for running the research pipeline outside of Next.js (e.g. a CLI or a non-Vercel host); it is **not** used by the deployed frontend and doesn't need to be started for the app above to work.
-
-Required env vars (see `frontend/.env.example`):
+**Env vars** (in `frontend/.env.example`):
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `GROQ_API_KEY` | Yes | LLM calls (Groq's OpenAI-compatible endpoint) |
+| `GROQ_API_KEY` | Yes | Powers both LLM calls, via Groq's OpenAI-compatible endpoint |
 | `GROQ_MODEL` | No | Defaults to `llama-3.1-8b-instant` |
-| `NEWSAPI_KEY` | No | Enables news + sentiment; omitted → neutral sentiment, no crash |
+| `NEWSAPI_KEY` | No | Enables news fetch + sentiment; omitted → sentiment defaults to neutral, nothing breaks |
 
-## Deploying to Vercel
+There's also a standalone Express server in `backend/` that runs the identical pipeline (`npm run dev` inside `backend/`, port from `$PORT`/defaults to 4000). It exists so the pipeline can run somewhere that isn't serverless-function-shaped — that's what's actually deployed on Render for the live demo above, since Netlify's free-tier function timeout (10s) is too short for a run that legitimately takes 15-30+ seconds. The Netlify-hosted frontend talks to it via `NEXT_PUBLIC_BACKEND_URL`; running locally, you don't need it — the frontend's own API route handles everything.
 
-1. **`vercel.json`** lives in `frontend/` (not the repo root) and sets the research route's max duration:
-   ```json
-   { "functions": { "src/app/api/research/route.ts": { "maxDuration": 120 } } }
-   ```
-   120s comfortably fits Vercel's current Hobby-tier limit (300s with Fluid Compute) as well as Pro, so this works on the free tier.
-2. Push to GitHub.
-3. In Vercel, **Add New → Project**, import this repo, and set **Root Directory to `frontend`** — this is the part that's easy to miss, since the actual Next.js app isn't at the repo root.
-4. Add environment variables in the Vercel project settings: `GROQ_API_KEY` (required), `GROQ_MODEL` (optional), `NEWSAPI_KEY` (optional).
-5. Deploy. The frontend calls its own `/api/research` route on the same origin — no `NEXT_PUBLIC_BACKEND_URL` needed in production.
+## How It Works
 
-## What I'd Improve
+```
+fetchData (no LLM) → synthesize (LLM #1) → score (no LLM) → narrate (LLM #2)
+```
 
-- **RAG over SEC filings** — pull 10-K "Risk Factors" sections for the risk-synthesis step instead of relying solely on news coverage, which skews toward recent sentiment over structural risk.
-- **Backtest the scoring engine** — the weights (growth 25%, valuation 20%, etc.) are reasonable priors, not fitted; running them against historical financials + forward returns would validate or recalibrate them with actual evidence.
-- **Cache with stale-while-revalidate** — Yahoo/NewsAPI data doesn't change minute to minute; caching by symbol would cut latency and API usage for repeated searches without sacrificing freshness.
-- **Multi-company comparison mode** — run the pipeline for 2-3 tickers in parallel and render score breakdowns side by side; the scoring engine already returns a comparable structure, this is mostly a frontend layout problem.
-- **WebSocket instead of NDJSON** — fine for one-way progress updates today, but a WebSocket would allow cancelling a specific in-flight step or steering the run (e.g. "skip news, just give me the financials") without a new HTTP request.
-- **Collapse the duplicated pipeline code** — `frontend/src` and `backend/src` currently contain near-identical copies of the agent nodes and services. Worth extracting into a shared package before it drifts.
-- **Move rate limiting off in-memory state** — the current per-IP limiter is a `Map` in the route module, which resets on redeploy and isn't shared across serverless instances; fine for a demo, not for anything with real traffic (Upstash/Redis would fix this).
+**1. `fetchData`** — five independent, no-LLM data fetches, fired in parallel with `Promise.allSettled` so one failing doesn't take the others down: Yahoo Finance profile, financials, and ~1 year of daily price history; NewsAPI articles; and locally-computed technical indicators (SMA/RSI/MACD via the `technicalindicators` library). Ticker resolution happens here too — if the company name can't be resolved to a real symbol, the pipeline stops immediately with an explicit error, before any LLM call, rather than letting the model guess a profile for a company that doesn't exist.
+
+**2. `synthesize`** (LLM call #1) — reads the fetched news and financials and returns structured sentiment, competitive positioning, and risk factors. This is the only place the model is allowed to interpret anything, and it's told explicitly to work only from the data it's handed, not from memory — an LLM asked to "tell me about Company X" will happily invent a plausible-sounding but wrong number.
+
+**3. `score`** — a pure function, zero network calls, zero LLM calls. Combines growth, valuation, leverage, sentiment, risk, and competition into a weighted 0-100 score (weights: growth 25%, valuation 20%, leverage 15%, sentiment 10%, risk 20%, competition 10%; ≥60 → INVEST). Feed it the same inputs twice, get the same score twice.
+
+**4. `narrate`** (LLM call #2) — takes the already-decided verdict as a fixed fact and writes the bull case, bear case, and memo explaining it. Its schema has no field that could override the decision — it explains, it doesn't decide.
+
+Progress streams to the browser as NDJSON (one `{step, status, ...}` line per event) so the UI shows a live step-by-step timeline instead of a blank spinner for the run's duration.
+
+## Key Decisions & Trade-offs
+
+- **Two LLM calls, not five or six.** Every step that's arithmetic is code, not a prompt. This cuts latency and cost, and — more importantly for a *research* tool — means the score can't silently drift between two runs on identical data just because the model felt like phrasing something differently.
+- **Deterministic scoring over an LLM verdict.** The trade-off: the scoring weights are reasoned priors (heavier on growth and risk), not fitted to historical outcomes. I'd rather ship a transparent, wrong-in-a-debuggable-way formula than a black-box number an LLM produced with no way to audit why.
+- **Real data sources, never memorized facts.** Yahoo Finance and NewsAPI are queried live on every run. Slower and dependent on external uptime, but the alternative — letting the model answer from training data — means stale or fabricated numbers with no way for the user to tell the difference.
+- **Zod schemas on both LLM calls.** `withStructuredOutput()` validates every model response against a schema before it's used; a malformed response fails validation and retries rather than silently corrupting the report.
+- **Graceful degradation over hard failure.** A fake company name stops the pipeline immediately with an honest error. A real company with a data source down (Yahoo hiccup, missing `NEWSAPI_KEY`, LLM 5xx) still produces a report — with the gap explicitly shown (a "3/5 data sources" indicator, plus a documented-gaps section) rather than either crashing or quietly filling the hole with a guess.
+- **Split deployment (Netlify + Render) over a single Vercel deploy.** The Next.js app is fully self-contained and would run as one deployment on Vercel (Hobby tier allows up to 300s function duration, comfortably covering this pipeline). Netlify's function timeout is too short for the same route, so the demo instead runs the frontend on Netlify and the pipeline as a persistent Express process on Render, connected via `NEXT_PUBLIC_BACKEND_URL`. More moving parts, but it's what got a working streaming demo onto Netlify specifically.
+- **What I left out:** no caching layer (every search re-fetches everything, even for a symbol just searched), no auth/persistence beyond a local search history in `localStorage`, and the `backend/` and `frontend/src` pipeline code is currently duplicated rather than shared — see below.
+
+## Example Runs
+
+*(Replace this section with 2-3 real screenshots or pasted output from the live demo — e.g. a well-known ticker like `NVDA` or `AAPL` producing an INVEST verdict, and a deliberately fake company like "Banana Corp" showing the ticker-not-found error instead of a hallucinated report. Showing the failure case is arguably the more interesting example.)*
+
+## What I'd Improve With More Time
+
+- **Cache with stale-while-revalidate.** Yahoo/NewsAPI data doesn't change minute to minute; caching by symbol would cut latency and repeated API usage for the same search.
+- **Backtest the scoring weights.** They're reasonable priors right now, not fitted to anything — running them against historical financials and forward returns would validate or recalibrate them with actual evidence instead of judgment calls.
+- **RAG over SEC filings.** Pulling 10-K "Risk Factors" sections for the risk-synthesis step, instead of relying on recent news alone, which skews toward sentiment over structural risk.
+- **Collapse the duplicated pipeline code.** `frontend/src` and `backend/src` currently contain near-identical copies of the same agent nodes and services, an artifact of splitting into two deployable services under time pressure. Worth extracting into a shared package before it drifts.
+- **Multi-company comparison mode.** Run the pipeline for 2-3 tickers in parallel and show score breakdowns side by side — the scoring engine already returns a directly comparable structure.
+- **Move rate limiting out of memory.** The current per-IP limiter is a `Map` in the route module, which resets on redeploy and isn't shared across instances — fine for a demo, not for real traffic.
 
 ## Tech Stack
 
 | Choice | Why |
 |---|---|
-| **Next.js 14 (App Router)** | One project for UI + the streaming `/api/research` route — no separate backend to deploy for the common case. |
-| **TypeScript (strict, `noUncheckedIndexedAccess`)** | Caught real bugs during development (array-index-as-`undefined` cases in the technicals math) that loose TS would have let through silently. |
-| **LangChain (`@langchain/openai`) + Groq** | `withStructuredOutput()` gives schema-enforced LLM output for free; Groq's OpenAI-compatible endpoint serving Llama 3.1 8B keeps per-call latency low enough for a synchronous research pipeline. |
-| **Zod** | Single source of truth for LLM output shape — the schema *is* the contract, not a type someone forgot to update after changing a prompt. |
-| **yahoo-finance2** | Free, no API key, covers profile/financials/history in one library instead of stitching together several paid data vendors for a demo project. |
-| **NewsAPI** | Simple REST API for recent article search; treated as optional/best-effort since it's the one external dependency without a generous free tier. |
-| **technicalindicators** | Battle-tested SMA/RSI/MACD implementations instead of hand-rolling indicator math. |
-| **lightweight-charts** | TradingView's charting library — real candlestick rendering with a much smaller bundle than most React chart libraries. |
-| **recharts** | Used only for the radar chart; good enough there and avoids pulling in a second heavy charting dependency for one visualization. |
-| **Tailwind CSS** | Fast to hit specific responsive breakpoints (2-col → 4-col grids, stacking on mobile) without hand-writing media queries. |
-| **Zod-validated NDJSON over fetch streams** | No new infrastructure (no WebSocket server) while still giving the frontend real-time step-by-step progress. |
+| Next.js 14 (App Router) | UI and the streaming API route in one project, no separate backend needed for the common case. |
+| TypeScript (strict) | Caught real indexing bugs in the technicals math during development that loose TS would've let through. |
+| LangChain (`@langchain/openai`) + Groq | `withStructuredOutput()` gives schema-enforced output for free; Groq serving Llama 3.1 8B keeps latency low enough for a synchronous multi-call pipeline. |
+| Zod | The schema *is* the contract for LLM output — not a type that can silently drift from the prompt. |
+| yahoo-finance2 | Free, no API key, covers profile/financials/history in one library. |
+| NewsAPI | Simple REST search API; treated as optional since it's the one dependency without a generous free tier. |
+| technicalindicators | Battle-tested SMA/RSI/MACD instead of hand-rolled indicator math. |
+| lightweight-charts | Real candlestick rendering, smaller bundle than most React chart libraries. |
+| Tailwind CSS | Fast, precise responsive breakpoints (2-col → 4-col grids, mobile stacking) without hand-written media queries. |
