@@ -116,8 +116,9 @@ export function useResearchStream() {
     setState({ ...freshState(), phase: "running", companyName });
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
-      const response = await fetch(`${backendUrl}/api/research`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/+$/u, "") ?? "";
+      const requestUrl = backendUrl ? `${backendUrl}/api/research` : "/api/research";
+      const response = await fetch(requestUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companyName }),
