@@ -67,6 +67,10 @@ Progress streams to the browser as NDJSON (one `{step, status, ...}` line per ev
 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/4e39fcd3-9630-4dfe-a039-a5d317a18932" />
 
+fake company search 
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d795cf7e-0ffb-40e1-a5b4-541c08bce505" />
+
+
 
 ## What I'd Improve With More Time
 
