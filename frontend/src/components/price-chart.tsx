@@ -3,20 +3,46 @@
 import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType, CandlestickSeries, LineSeries, type UTCTimestamp } from "lightweight-charts";
 import type { ResearchReport } from "@/agents/types";
+import { Card, CardLabel, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PriceChartProps {
   report: ResearchReport;
 }
 
 /**
+ * Resolved hex values of the design tokens in globals.css. lightweight-charts
+ * renders to <canvas>, so CSS custom properties can't be read directly here —
+ * if a token color changes in globals.css, these need the matching hex
+ * updated manually.
+ */
+const CHART_COLORS = {
+  surface: "#0d1117",
+  textMuted: "#9ca3af",
+  gridLine: "rgba(255,255,255,0.05)",
+  axisBorder: "rgba(255,255,255,0.1)",
+  positive: "#34d399",
+  negative: "#f87171",
+  warning: "#fbbf24",
+  accent: "#5b7cf0",
+};
+
+/**
  * price-chart.tsx
  *
- * Renders report.candles — real OHLCV history fetched from Yahoo Finance —
- * never mock/placeholder data. If history failed to fetch (Yahoo down, or
- * this ticker has no history), candles is an empty array and we show an
- * explicit "no history available" state instead of fabricating a chart.
- * Support/resistance/SMA overlay lines are derived from report.technicals
- * (already computed server-side), not invented client-side.
+ * Renders report.candles — real OHLCV history from Yahoo Finance — never
+ * mock data. If history is unavailable, candles is empty and we show an
+ * explicit empty state instead of fabricating a chart. Support/resistance/
+ * SMA overlays come from report.technicals (server-computed), drawn as flat
+ * reference lines since technicals only gives a single current value, not a
+ * historical series.
+ *
+ * Mobile bug fix: the chart used to get a hardcoded height: 400 in JS
+ * regardless of its actual CSS container height (280px on mobile). It now
+ * reads the container's real clientHeight on mount, and the ResizeObserver
+ * syncs both width AND height (it previously only synced width), so the
+ * canvas can never outgrow its box again.
  */
 export function PriceChart({ report }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -26,29 +52,31 @@ export function PriceChart({ report }: PriceChartProps) {
   useEffect(() => {
     if (!containerRef.current || candles.length === 0) return;
 
+    setIsReady(false);
+
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 400,
+      height: containerRef.current.clientHeight,
       layout: {
-        background: { type: ColorType.Solid, color: "#0d1117" },
-        textColor: "#e6edf3",
-        fontFamily: "IBM Plex Mono, monospace",
+        background: { type: ColorType.Solid, color: CHART_COLORS.surface },
+        textColor: CHART_COLORS.textMuted,
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
       },
       grid: {
-        vertLines: { color: "rgba(255,255,255,0.05)" },
-        horzLines: { color: "rgba(255,255,255,0.05)" },
+        vertLines: { color: CHART_COLORS.gridLine },
+        horzLines: { color: CHART_COLORS.gridLine },
       },
-      rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" },
-      timeScale: { borderColor: "rgba(255,255,255,0.1)" },
+      rightPriceScale: { borderColor: CHART_COLORS.axisBorder },
+      timeScale: { borderColor: CHART_COLORS.axisBorder },
       crosshair: { mode: 0 },
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#3fb950",
-      downColor: "#f85149",
+      upColor: CHART_COLORS.positive,
+      downColor: CHART_COLORS.negative,
       borderVisible: false,
-      wickUpColor: "#3fb950",
-      wickDownColor: "#f85149",
+      wickUpColor: CHART_COLORS.positive,
+      wickDownColor: CHART_COLORS.negative,
     });
 
     const data = candles.map((item) => ({
@@ -60,16 +88,12 @@ export function PriceChart({ report }: PriceChartProps) {
     }));
     candleSeries.setData(data);
 
-    // Technicals only give us a single current support/resistance/SMA value
-    // (not a full historical series), so overlays are drawn as flat
-    // reference lines across the visible range rather than fabricated
-    // per-point curves. Omitted entirely when a level is null.
     const { support, resistance, sma50: sma50Value, sma200: sma200Value } = report.technicals;
     const firstTime = data[0]?.time;
     const lastTime = data[data.length - 1]?.time;
 
     if (support !== null && firstTime !== undefined && lastTime !== undefined) {
-      const supportLine = chart.addSeries(LineSeries, { color: "#3fb950", lineWidth: 2, lineStyle: 2 });
+      const supportLine = chart.addSeries(LineSeries, { color: CHART_COLORS.positive, lineWidth: 2, lineStyle: 2 });
       supportLine.setData([
         { time: firstTime, value: support },
         { time: lastTime, value: support },
@@ -77,7 +101,7 @@ export function PriceChart({ report }: PriceChartProps) {
     }
 
     if (resistance !== null && firstTime !== undefined && lastTime !== undefined) {
-      const resistanceLine = chart.addSeries(LineSeries, { color: "#f85149", lineWidth: 2, lineStyle: 2 });
+      const resistanceLine = chart.addSeries(LineSeries, { color: CHART_COLORS.negative, lineWidth: 2, lineStyle: 2 });
       resistanceLine.setData([
         { time: firstTime, value: resistance },
         { time: lastTime, value: resistance },
@@ -85,7 +109,7 @@ export function PriceChart({ report }: PriceChartProps) {
     }
 
     if (sma50Value !== null && firstTime !== undefined && lastTime !== undefined) {
-      const sma50 = chart.addSeries(LineSeries, { color: "#d29922", lineWidth: 2 });
+      const sma50 = chart.addSeries(LineSeries, { color: CHART_COLORS.warning, lineWidth: 2 });
       sma50.setData([
         { time: firstTime, value: sma50Value },
         { time: lastTime, value: sma50Value },
@@ -93,7 +117,7 @@ export function PriceChart({ report }: PriceChartProps) {
     }
 
     if (sma200Value !== null && firstTime !== undefined && lastTime !== undefined) {
-      const sma200 = chart.addSeries(LineSeries, { color: "#58a6ff", lineWidth: 2 });
+      const sma200 = chart.addSeries(LineSeries, { color: CHART_COLORS.accent, lineWidth: 2 });
       sma200.setData([
         { time: firstTime, value: sma200Value },
         { time: lastTime, value: sma200Value },
@@ -102,7 +126,10 @@ export function PriceChart({ report }: PriceChartProps) {
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width });
+        chart.applyOptions({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
       }
     });
     resizeObserver.observe(containerRef.current);
@@ -115,33 +142,38 @@ export function PriceChart({ report }: PriceChartProps) {
   }, [report.symbol, candles, report.technicals]);
 
   return (
-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
+    <Card>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Price action</div>
-          <div className="mt-1 text-lg font-semibold text-[#e6edf3]">{report.companyName} · ~1Y view</div>
+          <CardLabel>Price action</CardLabel>
+          <CardTitle>
+            {report.companyName} · ~1Y view
+          </CardTitle>
         </div>
         {candles.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.25em] text-[#8b949e]">
-            <span className="rounded-full border border-[#3fb950]/20 bg-[#3fb950]/10 px-2.5 py-1">Support</span>
-            <span className="rounded-full border border-[#f85149]/20 bg-[#f85149]/10 px-2.5 py-1">Resistance</span>
-            <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2.5 py-1">SMA 50</span>
-            <span className="rounded-full border border-[#58a6ff]/20 bg-[#58a6ff]/10 px-2.5 py-1">SMA 200</span>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="positive">Support</Badge>
+            <Badge variant="negative">Resistance</Badge>
+            <Badge variant="warning">SMA 50</Badge>
+            <Badge variant="accent">SMA 200</Badge>
           </div>
         )}
       </div>
 
       {candles.length === 0 ? (
-        <div className="flex h-[240px] w-full items-center justify-center rounded-2xl border border-dashed border-white/10 text-center text-sm text-[#8b949e]">
-          Price history is unavailable for this symbol right now — the chart is skipped rather than showing
-          placeholder data.
+        <div className="flex h-[240px] w-full items-center justify-center rounded-md border border-dashed border-border text-center text-sm text-foreground-muted">
+          Price history is unavailable for this symbol right now.
         </div>
       ) : (
-        <>
-          <div ref={containerRef} className="h-[280px] w-full sm:h-[400px]" />
-          {!isReady && <div className="mt-2 text-sm text-[#8b949e]">Preparing chart…</div>}
-        </>
+        <div className="relative h-[280px] w-full sm:h-[400px]">
+          {!isReady && (
+            <div className="absolute inset-0 p-1">
+              <Skeleton className="h-full w-full" />
+            </div>
+          )}
+          <div ref={containerRef} className="h-full w-full" />
+        </div>
       )}
-    </section>
+    </Card>
   );
 }

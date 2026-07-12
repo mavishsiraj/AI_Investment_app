@@ -2,36 +2,39 @@
 
 import { Activity, Building2, DollarSign, Landmark, LineChart, Percent, ShieldCheck, TrendingUp } from "lucide-react";
 import type { ResearchReport } from "@/agents/types";
+import { Card, CardLabel } from "@/components/ui/card";
+import { StatusIndicator, type StatusLevel } from "@/components/ui/status-indicator";
 
 interface MetricsGridProps {
   report: ResearchReport;
 }
 
-function getDotClass(metric: string, value: string | number) {
+/** Thresholds unchanged from the original implementation — only the visual treatment changed. */
+function getStatusLevel(metric: string, value: string | number): StatusLevel {
   const numericValue = Number(String(value).replace(/[^0-9.-]/g, ""));
 
   if (metric === "peRatio") {
-    if (Number.isNaN(numericValue)) return "bg-amber-400";
-    if (numericValue < 25) return "bg-[#3fb950]";
-    if (numericValue < 40) return "bg-amber-400";
-    return "bg-[#f85149]";
+    if (Number.isNaN(numericValue)) return "warning";
+    if (numericValue < 25) return "positive";
+    if (numericValue < 40) return "warning";
+    return "negative";
   }
 
   if (metric === "returnOnEquity") {
-    if (Number.isNaN(numericValue)) return "bg-amber-400";
-    if (numericValue > 15) return "bg-[#3fb950]";
-    if (numericValue > 8) return "bg-amber-400";
-    return "bg-[#f85149]";
+    if (Number.isNaN(numericValue)) return "warning";
+    if (numericValue > 15) return "positive";
+    if (numericValue > 8) return "warning";
+    return "negative";
   }
 
   if (metric === "debtToEquity") {
-    if (Number.isNaN(numericValue)) return "bg-amber-400";
-    if (numericValue < 0.5) return "bg-[#3fb950]";
-    if (numericValue < 1) return "bg-amber-400";
-    return "bg-[#f85149]";
+    if (Number.isNaN(numericValue)) return "warning";
+    if (numericValue < 0.5) return "positive";
+    if (numericValue < 1) return "warning";
+    return "negative";
   }
 
-  return "bg-amber-400";
+  return "neutral";
 }
 
 const metrics = [
@@ -43,7 +46,7 @@ const metrics = [
   { label: "ROE", value: "returnOnEquity", icon: ShieldCheck },
   { label: "D/E", value: "debtToEquity", icon: Activity },
   { label: "Margin", value: "profitMargin", icon: Percent },
-];
+] as const;
 
 export function MetricsGrid({ report }: MetricsGridProps) {
   const financials = report.financials;
@@ -61,28 +64,32 @@ export function MetricsGrid({ report }: MetricsGridProps) {
   };
 
   return (
-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
-      <div className="mb-4 text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Metrics</div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <Card>
+      <CardLabel>Metrics</CardLabel>
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {metrics.map((metric) => {
           const value = metricValues[metric.value as keyof typeof metricValues];
           const Icon = metric.icon;
-          const dotClass = getDotClass(metric.value, value);
+          const isQualitative = metric.value === "sector";
+          const level = getStatusLevel(metric.value, value);
 
           return (
-            <div key={metric.label} className="rounded-2xl border border-white/8 bg-white/5 p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-sm text-[#8b949e]">
-                  <Icon className="h-4 w-4 text-[#58a6ff]" />
+            <div
+              key={metric.label}
+              className="flex h-full flex-col justify-between gap-3 rounded-md border border-border bg-white/[0.02] p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+                  <Icon className="h-3.5 w-3.5 text-foreground-faint" aria-hidden="true" />
                   {metric.label}
                 </div>
-                <span className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
+                {!isQualitative && <StatusIndicator level={level} />}
               </div>
-              <div className="font-mono text-sm text-[#e6edf3]">{value}</div>
+              <div className="font-mono text-sm tabular-nums text-foreground">{value}</div>
             </div>
           );
         })}
       </div>
-    </section>
+    </Card>
   );
 }

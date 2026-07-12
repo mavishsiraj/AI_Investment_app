@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
   onSearch: (companyName: string) => void;
@@ -27,24 +30,31 @@ export function SearchBar({ onSearch, disabled }: SearchBarProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-2 sm:flex-row">
-      <input
-        type="text"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        disabled={disabled}
-        maxLength={MAX_LENGTH}
-        placeholder="Company name or ticker (e.g. Apple, AAPL)"
-        aria-label="Company name or ticker"
-        className="text-base flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-4 py-3 text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-      />
-      <button
-        type="submit"
-        disabled={disabled || !trimmed}
-        className="rounded-md bg-amber-600 px-5 py-3 font-medium text-neutral-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-      >
+    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3 sm:flex-row">
+      <div className="relative flex-1">
+        <Search
+          className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-foreground-faint"
+          aria-hidden="true"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          disabled={disabled}
+          maxLength={MAX_LENGTH}
+          placeholder="Company name or ticker — try Apple, NVDA, Infosys…"
+          aria-label="Company name or ticker"
+          className={cn(
+            "h-14 w-full rounded-md border border-border bg-surface pl-11 pr-4 text-base text-foreground",
+            "placeholder:text-foreground-faint",
+            "transition-colors focus:border-accent/50 focus:outline-none",
+            "disabled:cursor-not-allowed disabled:opacity-50"
+          )}
+        />
+      </div>
+      <Button type="submit" size="lg" disabled={disabled || !trimmed} className="sm:w-40">
         {disabled ? "Researching…" : "Research"}
-      </button>
+      </Button>
     </form>
   );
 }

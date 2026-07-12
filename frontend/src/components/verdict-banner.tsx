@@ -1,77 +1,111 @@
 "use client";
 
-import { ArrowUpRight, BadgeDollarSign, Compass, TrendingUp } from "lucide-react";
+import { motion } from "framer-motion";
+import { Compass, LogIn, ShieldAlert, Target } from "lucide-react";
 import type { ResearchReport } from "@/agents/types";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface VerdictBannerProps {
   report: ResearchReport;
 }
 
+/** report.verdict.decision is exactly "INVEST" | "PASS". */
 export function VerdictBanner({ report }: VerdictBannerProps) {
   const decision = report.verdict.decision;
   const confidence = Math.max(0, Math.min(100, report.verdict.confidence));
   const isInvest = decision === "INVEST";
-  const accent = isInvest ? "#3fb950" : "#f85149";
-  const badgeText = isInvest ? "Bullish signal" : "Risk-adjusted pass";
 
   return (
-    <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[#0d1117]/90 p-6 shadow-[0_20px_80px_rgba(0,0,0,0.3)] sm:p-8">
+    <Card elevated className="overflow-hidden">
       <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-2xl space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-[#8b949e]">
-            <Compass className="h-3.5 w-3.5" />
-            {badgeText}
-          </div>
+        <div className="max-w-2xl space-y-4">
+          <Badge variant={isInvest ? "positive" : "neutral"}>
+            <Compass className="h-3.5 w-3.5" aria-hidden="true" />
+            {isInvest ? "Bullish signal" : "Risk-adjusted pass"}
+          </Badge>
 
           <div className="space-y-3">
-            <div className="text-sm font-mono uppercase tracking-[0.3em] text-[#8b949e]">
+            <div className="font-mono text-sm uppercase tracking-label text-foreground-muted">
               {report.companyName} · {report.symbol}
             </div>
-            <div className="text-5xl font-semibold tracking-[0.24em] text-[#e6edf3] sm:text-6xl">
+
+            <div
+              className={cn(
+                "inline-flex items-baseline gap-3 rounded-md border px-5 py-3",
+                isInvest ? "border-positive/30 bg-positive-muted" : "border-negative/30 bg-negative-muted"
+              )}
+            >
               <span
-                className="inline-block rounded-full border px-5 py-3 shadow-[0_0_40px_rgba(255,255,255,0.08)]"
-                style={{ borderColor: `${accent}44`, boxShadow: `0 0 0 1px ${accent}33, 0 0 40px ${accent}22` }}
+                className={cn(
+                  "text-4xl font-semibold tracking-tight sm:text-5xl",
+                  isInvest ? "text-positive" : "text-negative"
+                )}
               >
                 {decision}
               </span>
             </div>
-            <p className="max-w-xl text-base leading-7 text-[#8b949e]">
+
+            <p className="max-w-xl text-base leading-7 text-foreground-muted">
               {report.verdict.reasoning || "The synthesis is available and the memo is being assembled."}
             </p>
           </div>
         </div>
 
-        <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#161b22]/90 p-5">
-          <div className="mb-4 flex items-center justify-between text-sm text-[#8b949e]">
-            <span className="font-mono uppercase tracking-[0.25em]">Confidence</span>
-            <span className="font-semibold text-[#e6edf3]">{confidence}/100</span>
+        <Card className="w-full max-w-md p-5" elevated>
+          <div className="mb-3 flex items-center justify-between text-sm">
+            <span className="font-mono uppercase tracking-label text-foreground-muted">Confidence</span>
+            <span className="font-mono font-semibold tabular-nums text-foreground">{confidence}/100</span>
           </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${confidence}%`, background: `linear-gradient(90deg, ${accent}, ${accent}CC)` }}
+
+          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+            <motion.div
+              className={cn("h-full rounded-full", isInvest ? "bg-positive" : "bg-negative")}
+              initial={{ width: 0 }}
+              animate={{ width: `${confidence}%` }}
+              transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
             />
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#e6edf3]">
-              <BadgeDollarSign className="h-4 w-4 text-[#58a6ff]" />
-              Entry {report.verdict.entryPrice ? `$${report.verdict.entryPrice.toFixed(2)}` : "N/A"}
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#e6edf3]">
-              <TrendingUp className="h-4 w-4 text-[#3fb950]" />
-              Target {report.verdict.targetPrice ? `$${report.verdict.targetPrice.toFixed(2)}` : "N/A"}
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#e6edf3]">
-              <ArrowUpRight className="h-4 w-4 text-[#f85149]" />
-              Stop {report.verdict.stopLoss ? `$${report.verdict.stopLoss.toFixed(2)}` : "N/A"}
-            </div>
-            <div className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-sm font-medium uppercase tracking-[0.25em] text-amber-300">
-              {report.verdict.horizon ?? "medium-term"}
-            </div>
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <PriceStat icon={LogIn} label="Entry" value={report.verdict.entryPrice} tone="neutral" />
+            <PriceStat icon={Target} label="Target" value={report.verdict.targetPrice} tone="positive" />
+            <PriceStat icon={ShieldAlert} label="Stop" value={report.verdict.stopLoss} tone="negative" />
           </div>
+
+          <div className="mt-3">
+            <Badge variant="accent" className="capitalize">
+              {report.verdict.horizon ?? "medium-term"}
+            </Badge>
+          </div>
+        </Card>
+      </div>
+    </Card>
+  );
+}
+
+function PriceStat({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: typeof Target;
+  label: string;
+  value: number | null;
+  tone: "neutral" | "positive" | "negative";
+}) {
+  const toneClass = tone === "positive" ? "text-positive" : tone === "negative" ? "text-negative" : "text-accent";
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-border bg-white/[0.02] px-3 py-2">
+      <Icon className={cn("h-4 w-4 shrink-0", toneClass)} aria-hidden="true" />
+      <div className="leading-tight">
+        <div className="text-xs text-foreground-faint">{label}</div>
+        <div className="font-mono text-sm tabular-nums text-foreground">
+          {value !== null ? `$${value.toFixed(2)}` : "N/A"}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

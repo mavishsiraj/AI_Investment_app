@@ -2,6 +2,8 @@
 
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
 import type { ResearchReport } from "@/agents/types";
+import { Card, CardLabel } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface ScoreRadarProps {
   report: ResearchReport;
@@ -19,15 +21,15 @@ export function ScoreRadar({ report }: ScoreRadarProps) {
   ];
 
   return (
-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
+    <Card>
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <div className="text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Score radar</div>
-          <div className="mt-1 text-2xl font-semibold text-[#e6edf3]">{Math.round(scores.weighted)}/100</div>
+          <CardLabel>Score radar</CardLabel>
+          <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground">
+            {Math.round(scores.weighted)}/100
+          </div>
         </div>
-        <div className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
-          Weighted score
-        </div>
+        <Badge variant="accent">Weighted score</Badge>
       </div>
 
       <div className="h-[280px]">
@@ -36,19 +38,13 @@ export function ScoreRadar({ report }: ScoreRadarProps) {
             <PolarGrid stroke="rgba(255,255,255,0.08)" />
             <PolarAngleAxis
               dataKey="subject"
-              tick={{ fill: "#8b949e", fontSize: 11, fontFamily: "IBM Plex Mono, monospace" }}
+              tick={{ fill: "#9ca3af", fontSize: 11, fontFamily: "ui-monospace, monospace" }}
             />
             <PolarRadiusAxis angle={20} domain={[0, 100]} tick={false} axisLine={false} />
-            <Radar
-              dataKey="value"
-              stroke="#d29922"
-              fill="#d29922"
-              fillOpacity={0.15}
-              strokeWidth={2}
-            />
+            <Radar dataKey="value" stroke="#5b7cf0" fill="#5b7cf0" fillOpacity={0.15} strokeWidth={2} />
           </RadarChart>
         </ResponsiveContainer>
       </div>
-    </section>
+    </Card>
   );
 }
