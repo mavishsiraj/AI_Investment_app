@@ -62,7 +62,8 @@ Progress streams to the browser as NDJSON (one `{step, status, ...}` line per ev
 
 ## Example Runs
 
-*(Replace this section with 2-3 real screenshots or pasted output from the live demo — e.g. a well-known ticker like `NVDA` or `AAPL` producing an INVEST verdict, and a deliberately fake company like "Banana Corp" showing the ticker-not-found error instead of a hallucinated report. Showing the failure case is arguably the more interesting example.)*
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/fe657ba7-355e-4786-9d70-1e855fe5bc53" />
+
 
 ## What I'd Improve With More Time
 
