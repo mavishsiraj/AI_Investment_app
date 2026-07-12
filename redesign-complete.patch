@@ -1,0 +1,1972 @@
+diff --git a/frontend/src/app/globals.css b/frontend/src/app/globals.css
+index da7ede9..a4065fe 100644
+--- a/frontend/src/app/globals.css
++++ b/frontend/src/app/globals.css
+@@ -2,34 +2,87 @@
+ @tailwind components;
+ @tailwind utilities;
+ 
++/*
++ * Design tokens. Every color used anywhere in the app should trace back to
++ * one of these variables — no new hardcoded hex values in components.
++ * Contrast against --page / --surface has been checked against WCAG AA
++ * (4.5:1 for body text, 3:1 for large text / non-text UI). --fg-faint is
++ * reserved for icons and large text only — never body copy, which is what
++ * failed AA in the original audit.
++ */
+ :root {
+   color-scheme: dark;
++
++  --page: #07090d;
++  --surface: #0d1117;
++  --surface-elevated: #111827;
++
++  --border: rgba(255, 255, 255, 0.08);
++  --border-strong: rgba(255, 255, 255, 0.16);
++
++  --fg-primary: #f3f4f6;
++  --fg-muted: #9ca3af;
++  --fg-faint: #6b7280;
++
++  --accent: #5b7cf0;
++  --accent-muted: rgba(91, 124, 240, 0.14);
++  --accent-foreground: #eef2ff;
++
++  --positive: #34d399;
++  --positive-muted: rgba(52, 211, 153, 0.12);
++
++  --negative: #f87171;
++  --negative-muted: rgba(248, 113, 113, 0.12);
++
++  --warning: #fbbf24;
++  --warning-muted: rgba(251, 191, 36, 0.12);
+ }
+ 
+ html {
+-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+-  color-scheme: dark;
++  height: 100%;
+ }
+ 
+ body {
+   margin: 0;
+   min-height: 100vh;
+-  background: #06080e;
+-  color: #e6edf3;
++  background: var(--page);
++  color: var(--fg-primary);
++  font-feature-settings: "cv11", "ss01";
+ }
+ 
+ * {
+   box-sizing: border-box;
+ }
+ 
+-input,
+ button,
+-textarea,
++input,
+ select {
+   font: inherit;
++  color: inherit;
+ }
+ 
+ ::selection {
+-  background: rgba(211, 153, 34, 0.35);
+-  color: #e6edf3;
++  background: var(--accent-muted);
++  color: var(--fg-primary);
++}
++
++/* Consistent keyboard focus everywhere, including custom controls. */
++:focus-visible {
++  outline: 2px solid var(--accent);
++  outline-offset: 2px;
++}
++
++.tabular-nums {
++  font-variant-numeric: tabular-nums;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  *,
++  *::before,
++  *::after {
++    animation-duration: 0.001ms !important;
++    animation-iteration-count: 1 !important;
++    transition-duration: 0.001ms !important;
++    scroll-behavior: auto !important;
++  }
+ }
+diff --git a/frontend/src/app/page.tsx b/frontend/src/app/page.tsx
+index f529ea6..382762a 100644
+--- a/frontend/src/app/page.tsx
++++ b/frontend/src/app/page.tsx
+@@ -1,6 +1,8 @@
+ "use client";
+ 
+ import { useEffect, useRef, useState } from "react";
++import { AlertCircle } from "lucide-react";
++import { Card } from "@/components/ui/card";
+ import { Hero } from "@/components/hero";
+ import { PipelineTimeline } from "@/components/pipeline-timeline";
+ import { DataCoverageBadge } from "@/components/data-coverage-badge";
+@@ -49,30 +51,37 @@ export default function HomePage() {
+   const isRunning = phase === "running";
+ 
+   return (
+-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-4 py-8 text-neutral-100 sm:px-6 sm:py-10 lg:px-8">
++    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-4 py-8 text-foreground sm:px-6 sm:py-10 lg:px-8">
+       <Hero onSearch={run} disabled={isRunning} />
+ 
+       {phase !== "idle" && (
+-        <section className="flex flex-col gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
++        <Card className="animate-fade-slide-up flex flex-col gap-4">
+           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+-            <span className="text-sm text-neutral-300">{companyName}</span>
++            <span className="text-sm font-medium text-foreground">{companyName}</span>
+             {dataSources.length > 0 && <DataCoverageBadge dataSources={dataSources} />}
+           </div>
+           <PipelineTimeline steps={steps} />
+-        </section>
++        </Card>
+       )}
+ 
+       {phase === "error" && errorMessage && (
+         <section
+           role="alert"
+-          className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-sm text-red-300"
++          className="animate-fade-slide-up flex items-start gap-3 rounded-md border border-negative/25 bg-negative-muted p-4 text-sm text-negative"
+         >
+-          {errorMessage}
++          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
++          <div>
++            <p className="font-medium">Research couldn&apos;t be completed</p>
++            <p className="mt-1 text-negative/90">{errorMessage}</p>
++            <p className="mt-2 text-xs text-foreground-muted">
++              Try a different company name or ticker, or check the spelling and try again.
++            </p>
++          </div>
+         </section>
+       )}
+ 
+       {phase === "done" && report && (
+-        <div className="flex flex-col gap-6">
++        <div className="animate-fade-slide-up flex flex-col gap-6">
+           <div className="flex justify-end">
+             <ExportButton reportRef={reportRef} />
+           </div>
+diff --git a/frontend/src/components/bull-bear.tsx b/frontend/src/components/bull-bear.tsx
+index f04e40a..d7c6bc0 100644
+--- a/frontend/src/components/bull-bear.tsx
++++ b/frontend/src/components/bull-bear.tsx
+@@ -1,5 +1,8 @@
+ "use client";
+ 
++import { Plus, Minus } from "lucide-react";
++import { Card, CardLabel } from "@/components/ui/card";
++
+ interface BullBearProps {
+   bullCase: string[];
+   bearCase: string[];
+@@ -8,27 +11,35 @@ interface BullBearProps {
+ export function BullBear({ bullCase, bearCase }: BullBearProps) {
+   return (
+     <section className="grid gap-4 lg:grid-cols-2">
+-      <div className="rounded-[24px] border border-[#3fb950]/20 bg-[#3fb950]/10 p-5">
+-        <div className="mb-4 text-sm font-medium uppercase tracking-[0.3em] text-[#3fb950]">Bull case</div>
+-        <ul className="space-y-3">
++      <Card className="border-positive/20 bg-positive-muted">
++        <CardLabel className="text-positive">Bull case</CardLabel>
++        <ul className="mt-4 space-y-3">
+           {bullCase.map((point) => (
+-            <li key={point} className="rounded-2xl border border-[#3fb950]/20 bg-[#0d1117]/60 p-3 text-sm leading-6 text-[#e6edf3]">
+-              + {point}
++            <li
++              key={point}
++              className="flex items-start gap-2.5 rounded-md border border-positive/15 bg-surface/60 p-3 text-sm leading-6 text-foreground"
++            >
++              <Plus className="mt-0.5 h-4 w-4 shrink-0 text-positive" aria-hidden="true" />
++              {point}
+             </li>
+           ))}
+         </ul>
+-      </div>
++      </Card>
+ 
+-      <div className="rounded-[24px] border border-[#f85149]/20 bg-[#f85149]/10 p-5">
+-        <div className="mb-4 text-sm font-medium uppercase tracking-[0.3em] text-[#f85149]">Bear case</div>
+-        <ul className="space-y-3">
++      <Card className="border-negative/20 bg-negative-muted">
++        <CardLabel className="text-negative">Bear case</CardLabel>
++        <ul className="mt-4 space-y-3">
+           {bearCase.map((point) => (
+-            <li key={point} className="rounded-2xl border border-[#f85149]/20 bg-[#0d1117]/60 p-3 text-sm leading-6 text-[#e6edf3]">
+-              − {point}
++            <li
++              key={point}
++              className="flex items-start gap-2.5 rounded-md border border-negative/15 bg-surface/60 p-3 text-sm leading-6 text-foreground"
++            >
++              <Minus className="mt-0.5 h-4 w-4 shrink-0 text-negative" aria-hidden="true" />
++              {point}
+             </li>
+           ))}
+         </ul>
+-      </div>
++      </Card>
+     </section>
+   );
+ }
+diff --git a/frontend/src/components/data-coverage-badge.tsx b/frontend/src/components/data-coverage-badge.tsx
+index 2e466b3..5b98988 100644
+--- a/frontend/src/components/data-coverage-badge.tsx
++++ b/frontend/src/components/data-coverage-badge.tsx
+@@ -1,3 +1,5 @@
++import { Badge } from "@/components/ui/badge";
++
+ interface DataCoverageBadgeProps {
+   dataSources: string[];
+ }
+@@ -5,23 +7,31 @@ interface DataCoverageBadgeProps {
+ const TOTAL_DATA_SOURCES = 5;
+ const LIMITED_THRESHOLD = 3;
+ 
++/**
++ * data-coverage-badge.tsx
++ *
++ * Previously surfaced the source list only via a native `title` tooltip,
++ * unreachable on touch devices and easy to miss on desktop. The source
++ * list is now exposed as visible text on hover/focus via <details>, so
++ * it's keyboard- and touch-accessible.
++ */
+ export function DataCoverageBadge({ dataSources }: DataCoverageBadgeProps) {
+   const count = dataSources.length;
+   const limited = count < LIMITED_THRESHOLD;
+ 
+   return (
+-    <div
+-      className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs ${
+-        limited
+-          ? "border-amber-700 bg-amber-950/40 text-amber-300"
+-          : "border-neutral-700 bg-neutral-900 text-neutral-400"
+-      }`}
+-      title={dataSources.join(", ") || "No data sources returned data"}
+-    >
+-      <span className="font-mono">
+-        {count}/{TOTAL_DATA_SOURCES} data sources
+-      </span>
+-      {limited && <span>— Limited analysis — some data unavailable</span>}
+-    </div>
++    <details className="group relative">
++      <summary className="list-none">
++        <Badge variant={limited ? "warning" : "neutral"} className="cursor-pointer select-none">
++          <span className="font-mono tabular-nums">
++            {count}/{TOTAL_DATA_SOURCES} data sources
++          </span>
++          {limited && <span>· Limited analysis</span>}
++        </Badge>
++      </summary>
++      <div className="absolute right-0 top-full z-10 mt-2 w-56 rounded-md border border-border bg-surface-elevated p-3 text-xs text-foreground-muted shadow-card">
++        {dataSources.length > 0 ? dataSources.join(", ") : "No data sources returned data"}
++      </div>
++    </details>
+   );
+ }
+diff --git a/frontend/src/components/data-gaps.tsx b/frontend/src/components/data-gaps.tsx
+index 6a47afb..4fdb35c 100644
+--- a/frontend/src/components/data-gaps.tsx
++++ b/frontend/src/components/data-gaps.tsx
+@@ -1,20 +1,37 @@
+ "use client";
+ 
++import { Info } from "lucide-react";
++import { Card, CardLabel } from "@/components/ui/card";
++
+ interface DataGapsProps {
+   errors?: string[];
+ }
+ 
++/**
++ * data-gaps.tsx
++ *
++ * Only renders when there are non-fatal gaps to disclose — an empty state
++ * here would just be noise. Kept low-key (not warning/negative tokens):
++ * these are honest disclosures about partial data, not something wrong
++ * with the app.
++ */
+ export function DataGaps({ errors }: DataGapsProps) {
+   if (!errors || errors.length === 0) return null;
+ 
+   return (
+-    <section className="rounded-[20px] border border-white/8 bg-white/5 p-4 text-sm text-[#8b949e]">
+-      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-[#484f58]">Data gaps</div>
+-      <ul className="space-y-1">
+-        {errors.map((error) => (
+-          <li key={error}>• {error}</li>
++    <Card className="bg-white/[0.015]">
++      <div className="flex items-center gap-2">
++        <Info className="h-3.5 w-3.5 text-foreground-faint" aria-hidden="true" />
++        <CardLabel>Data gaps</CardLabel>
++      </div>
++      <ul className="mt-3 space-y-1.5 text-sm leading-6 text-foreground-muted">
++        {errors.map((error, index) => (
++          <li key={index} className="flex gap-2">
++            <span className="text-foreground-faint">·</span>
++            {error}
++          </li>
+         ))}
+       </ul>
+-    </section>
++    </Card>
+   );
+ }
+diff --git a/frontend/src/components/export-button.tsx b/frontend/src/components/export-button.tsx
+index 0ed99b0..34cca25 100644
+--- a/frontend/src/components/export-button.tsx
++++ b/frontend/src/components/export-button.tsx
+@@ -1,9 +1,10 @@
+ "use client";
+ 
+ import { useState, type RefObject } from "react";
+-import { Download } from "lucide-react";
++import { Download, Loader2 } from "lucide-react";
+ import jsPDF from "jspdf";
+ import html2canvas from "html2canvas";
++import { Button } from "@/components/ui/button";
+ 
+ interface ExportButtonProps {
+   reportRef: RefObject<HTMLElement>;
+@@ -18,7 +19,9 @@ export function ExportButton({ reportRef }: ExportButtonProps) {
+ 
+     setIsExporting(true);
+     try {
+-      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#06080e" });
++      // Matches --page from globals.css — html2canvas can't read CSS
++      // custom properties, so the background is passed explicitly.
++      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#07090d" });
+       const imgData = canvas.toDataURL("image/png");
+       const pdf = new jsPDF("p", "mm", "a4");
+       const pdfWidth = pdf.internal.pageSize.getWidth();
+@@ -36,13 +39,13 @@ export function ExportButton({ reportRef }: ExportButtonProps) {
+   }
+ 
+   return (
+-    <button
+-      type="button"
+-      onClick={handleExport}
+-      className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.3em] text-amber-300 transition hover:bg-amber-500/20"
+-    >
+-      <Download className="h-4 w-4" />
++    <Button type="button" variant="secondary" size="sm" onClick={handleExport} disabled={isExporting}>
++      {isExporting ? (
++        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
++      ) : (
++        <Download className="h-3.5 w-3.5" aria-hidden="true" />
++      )}
+       {isExporting ? "Generating…" : "Export PDF"}
+-    </button>
++    </Button>
+   );
+ }
+diff --git a/frontend/src/components/hero.tsx b/frontend/src/components/hero.tsx
+index d681fc2..a9881cf 100644
+--- a/frontend/src/components/hero.tsx
++++ b/frontend/src/components/hero.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+-import { ArrowRight, BarChart3, ShieldCheck, Sparkles } from "lucide-react";
++import { motion } from "framer-motion";
++import { BarChart3, ShieldCheck, Sparkles } from "lucide-react";
+ import { SearchBar } from "@/components/search-bar";
+ 
+ interface HeroProps {
+@@ -9,76 +10,96 @@ interface HeroProps {
+ }
+ 
+ const exampleTickers = ["NVIDIA", "Infosys", "Tesla", "Microsoft", "AMD"];
++
+ const howItWorks = [
+   {
+     title: "Live market context",
+-    description: "We pull company data, technicals, and recent market signals into a single view.",
++    description: "Company data, technicals, and recent market signals pulled into a single view.",
++    icon: BarChart3,
+   },
+   {
+     title: "Evidence-based scoring",
+-    description: "The verdict blends deterministic scores with structured synthesis and narrative reasoning.",
++    description: "A verdict blending deterministic scores with structured synthesis and narrative reasoning.",
++    icon: ShieldCheck,
+   },
+   {
+     title: "Decision-ready memo",
+-    description: "You get an invest/pass opinion, risk framing, and a concise investment memo.",
++    description: "An invest/pass opinion, risk framing, and a concise investment memo.",
++    icon: Sparkles,
+   },
+ ];
+ 
++/**
++ * hero.tsx
++ *
++ * Search is the hero, per design brief: large, centered, minimal chrome
++ * around it. "How it works" is a light three-up row beneath — informative
++ * on first visit, but not competing with the search field for attention.
++ */
+ export function Hero({ onSearch, disabled }: HeroProps) {
+   return (
+-    <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(211,153,34,0.14),_transparent_38%),linear-gradient(135deg,rgba(13,17,23,0.96),rgba(6,8,14,0.98))] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.35)] sm:p-8 lg:p-10">
+-      <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+-        <div className="space-y-6">
+-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-amber-300">
+-            <Sparkles className="h-3.5 w-3.5" />
+-            AI investment research agent
+-          </div>
++    <section className="flex flex-col items-center gap-10 px-2 pb-4 pt-10 text-center sm:pt-16">
++      <motion.div
++        initial={{ opacity: 0, y: 12 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ duration: 0.35, ease: "easeOut" }}
++        className="flex max-w-2xl flex-col items-center gap-5"
++      >
++        <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent-muted px-3 py-1 text-xs font-medium uppercase tracking-label text-accent">
++          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
++          AI investment research agent
++        </div>
+ 
+-          <div className="space-y-4">
+-            <h2 className="max-w-2xl text-4xl font-semibold tracking-tight text-[#e6edf3] sm:text-5xl">
+-              Bloomberg-grade research in a single prompt.
+-            </h2>
+-            <p className="max-w-xl text-base leading-7 text-[#8b949e] sm:text-lg">
+-              Investigate public companies with live financial, technical, news, and risk context — then
+-              receive a concise verdict with a memo you can act on.
+-            </p>
+-          </div>
++        <h1 className="text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
++          Bloomberg-grade research in a single prompt.
++        </h1>
+ 
+-          <SearchBar onSearch={onSearch} disabled={disabled} />
++        <p className="max-w-xl text-balance text-base leading-7 text-foreground-muted sm:text-lg">
++          Investigate any public company with live financial, technical, news, and risk context —
++          then get a concise verdict with a memo you can act on.
++        </p>
++      </motion.div>
+ 
+-          <div className="flex flex-wrap gap-2">
+-            {exampleTickers.map((example) => (
+-              <button
+-                key={example}
+-                type="button"
+-                onClick={() => onSearch(example)}
+-                disabled={disabled}
+-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-[#8b949e] transition hover:border-amber-400/40 hover:text-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+-              >
+-                {example}
+-              </button>
+-            ))}
+-          </div>
++      <motion.div
++        initial={{ opacity: 0, y: 12 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ duration: 0.35, delay: 0.08, ease: "easeOut" }}
++        className="w-full max-w-2xl"
++      >
++        <SearchBar onSearch={onSearch} disabled={disabled} />
++
++        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
++          <span className="text-xs text-foreground-faint">Try</span>
++          {exampleTickers.map((example) => (
++            <button
++              key={example}
++              type="button"
++              onClick={() => onSearch(example)}
++              disabled={disabled}
++              className="rounded-full border border-border bg-white/[0.03] px-3 py-1.5 text-sm text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
++            >
++              {example}
++            </button>
++          ))}
+         </div>
++      </motion.div>
+ 
+-        <div className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5 backdrop-blur">
+-          <div className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">
+-            <BarChart3 className="h-4 w-4 text-amber-400" />
+-            How it works
++      <motion.div
++        initial={{ opacity: 0, y: 12 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ duration: 0.35, delay: 0.16, ease: "easeOut" }}
++        className="grid w-full max-w-4xl gap-4 pt-2 text-left sm:grid-cols-3"
++      >
++        {howItWorks.map((item) => (
++          <div key={item.title} className="flex items-start gap-3 rounded-md border border-border bg-white/[0.02] p-4">
++            <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
++            <div>
++              <div className="text-sm font-medium text-foreground">{item.title}</div>
++              <p className="mt-1 text-sm leading-6 text-foreground-muted">{item.description}</p>
++            </div>
+           </div>
+-          <div className="space-y-3">
+-            {howItWorks.map((item) => (
+-              <div key={item.title} className="rounded-2xl border border-white/8 bg-white/5 p-4">
+-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#e6edf3]">
+-                  <ShieldCheck className="h-4 w-4 text-[#3fb950]" />
+-                  {item.title}
+-                </div>
+-                <p className="text-sm leading-6 text-[#8b949e]">{item.description}</p>
+-              </div>
+-            ))}
+-          </div>
+-        </div>
+-      </div>
++        ))}
++      </motion.div>
+     </section>
+   );
+ }
+diff --git a/frontend/src/components/metrics-grid.tsx b/frontend/src/components/metrics-grid.tsx
+index 7891350..8b2c117 100644
+--- a/frontend/src/components/metrics-grid.tsx
++++ b/frontend/src/components/metrics-grid.tsx
+@@ -2,36 +2,39 @@
+ 
+ import { Activity, Building2, DollarSign, Landmark, LineChart, Percent, ShieldCheck, TrendingUp } from "lucide-react";
+ import type { ResearchReport } from "@/agents/types";
++import { Card, CardLabel } from "@/components/ui/card";
++import { StatusIndicator, type StatusLevel } from "@/components/ui/status-indicator";
+ 
+ interface MetricsGridProps {
+   report: ResearchReport;
+ }
+ 
+-function getDotClass(metric: string, value: string | number) {
++/** Thresholds unchanged from the original implementation — only the visual treatment changed. */
++function getStatusLevel(metric: string, value: string | number): StatusLevel {
+   const numericValue = Number(String(value).replace(/[^0-9.-]/g, ""));
+ 
+   if (metric === "peRatio") {
+-    if (Number.isNaN(numericValue)) return "bg-amber-400";
+-    if (numericValue < 25) return "bg-[#3fb950]";
+-    if (numericValue < 40) return "bg-amber-400";
+-    return "bg-[#f85149]";
++    if (Number.isNaN(numericValue)) return "warning";
++    if (numericValue < 25) return "positive";
++    if (numericValue < 40) return "warning";
++    return "negative";
+   }
+ 
+   if (metric === "returnOnEquity") {
+-    if (Number.isNaN(numericValue)) return "bg-amber-400";
+-    if (numericValue > 15) return "bg-[#3fb950]";
+-    if (numericValue > 8) return "bg-amber-400";
+-    return "bg-[#f85149]";
++    if (Number.isNaN(numericValue)) return "warning";
++    if (numericValue > 15) return "positive";
++    if (numericValue > 8) return "warning";
++    return "negative";
+   }
+ 
+   if (metric === "debtToEquity") {
+-    if (Number.isNaN(numericValue)) return "bg-amber-400";
+-    if (numericValue < 0.5) return "bg-[#3fb950]";
+-    if (numericValue < 1) return "bg-amber-400";
+-    return "bg-[#f85149]";
++    if (Number.isNaN(numericValue)) return "warning";
++    if (numericValue < 0.5) return "positive";
++    if (numericValue < 1) return "warning";
++    return "negative";
+   }
+ 
+-  return "bg-amber-400";
++  return "neutral";
+ }
+ 
+ const metrics = [
+@@ -43,7 +46,7 @@ const metrics = [
+   { label: "ROE", value: "returnOnEquity", icon: ShieldCheck },
+   { label: "D/E", value: "debtToEquity", icon: Activity },
+   { label: "Margin", value: "profitMargin", icon: Percent },
+-];
++] as const;
+ 
+ export function MetricsGrid({ report }: MetricsGridProps) {
+   const financials = report.financials;
+@@ -61,28 +64,32 @@ export function MetricsGrid({ report }: MetricsGridProps) {
+   };
+ 
+   return (
+-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
+-      <div className="mb-4 text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Metrics</div>
+-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
++    <Card>
++      <CardLabel>Metrics</CardLabel>
++      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+         {metrics.map((metric) => {
+           const value = metricValues[metric.value as keyof typeof metricValues];
+           const Icon = metric.icon;
+-          const dotClass = getDotClass(metric.value, value);
++          const isQualitative = metric.value === "sector";
++          const level = getStatusLevel(metric.value, value);
+ 
+           return (
+-            <div key={metric.label} className="rounded-2xl border border-white/8 bg-white/5 p-3">
+-              <div className="mb-3 flex items-center justify-between gap-2">
+-                <div className="flex items-center gap-2 text-sm text-[#8b949e]">
+-                  <Icon className="h-4 w-4 text-[#58a6ff]" />
++            <div
++              key={metric.label}
++              className="flex h-full flex-col justify-between gap-3 rounded-md border border-border bg-white/[0.02] p-3"
++            >
++              <div className="flex items-center justify-between gap-2">
++                <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
++                  <Icon className="h-3.5 w-3.5 text-foreground-faint" aria-hidden="true" />
+                   {metric.label}
+                 </div>
+-                <span className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
++                {!isQualitative && <StatusIndicator level={level} />}
+               </div>
+-              <div className="font-mono text-sm text-[#e6edf3]">{value}</div>
++              <div className="font-mono text-sm tabular-nums text-foreground">{value}</div>
+             </div>
+           );
+         })}
+       </div>
+-    </section>
++    </Card>
+   );
+ }
+diff --git a/frontend/src/components/news-feed.tsx b/frontend/src/components/news-feed.tsx
+index bb4bead..dbdc8ed 100644
+--- a/frontend/src/components/news-feed.tsx
++++ b/frontend/src/components/news-feed.tsx
+@@ -1,93 +1,103 @@
+ "use client";
+ 
++import { ExternalLink } from "lucide-react";
+ import type { ResearchReport } from "@/agents/types";
++import { Card, CardLabel, CardTitle } from "@/components/ui/card";
++import { Badge } from "@/components/ui/badge";
++import { StatusIndicator, type StatusLevel } from "@/components/ui/status-indicator";
+ 
+ interface NewsFeedProps {
+   report: ResearchReport;
+ }
+ 
++const overallVariant: Record<string, "positive" | "negative" | "neutral"> = {
++  bullish: "positive",
++  bearish: "negative",
++  neutral: "neutral",
++};
++
++const sentimentLevel: Record<string, StatusLevel> = {
++  bullish: "positive",
++  bearish: "negative",
++  neutral: "neutral",
++};
++
+ /**
+  * news-feed.tsx
+  *
+  * Renders report.rawNews (real NewsAPI articles) and report.sentiment (the
+- * LLM's synthesis over those exact articles) — never sample/invented
+- * headlines. If NEWSAPI_KEY is missing or the request failed, rawNews is
+- * empty and sentiment defaults to neutral (per synthesize.ts's fallback);
+- * this component shows that explicitly rather than a hardcoded feed.
++ * LLM's synthesis over those exact articles) — never sample headlines. If
++ * NEWSAPI_KEY is missing or the request failed, rawNews is empty and
++ * sentiment defaults to neutral; this component shows that explicitly.
+  */
+-
+-const overallStyles: Record<string, string> = {
+-  bullish: "border-[#3fb950]/20 bg-[#3fb950]/10 text-[#3fb950]",
+-  bearish: "border-[#f85149]/20 bg-[#f85149]/10 text-[#f85149]",
+-  neutral: "border-white/10 bg-white/5 text-[#8b949e]",
+-};
+-
+-const perArticleDot: Record<string, string> = {
+-  bullish: "bg-[#3fb950]",
+-  bearish: "bg-[#f85149]",
+-  neutral: "bg-[#8b949e]",
+-};
+-
+ export function NewsFeed({ report }: NewsFeedProps) {
+   const { rawNews, sentiment } = report;
+   const overall = sentiment?.overall ?? "neutral";
+   const perArticleByIndex = new Map(sentiment?.perArticle.map((item) => [item.index, item.sentiment]) ?? []);
+ 
+   return (
+-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
++    <Card>
+       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+         <div>
+-          <div className="text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">News & sentiment</div>
+-          <div className="mt-1 text-lg font-semibold text-[#e6edf3]">{report.companyName}</div>
++          <CardLabel>News &amp; sentiment</CardLabel>
++          <CardTitle>{report.companyName}</CardTitle>
+         </div>
+-        <div className={`inline-block w-fit rounded-full border px-3 py-1 text-sm font-medium capitalize ${overallStyles[overall]}`}>
++        <Badge variant={overallVariant[overall]} className="w-fit capitalize">
+           {overall}
+-        </div>
++        </Badge>
+       </div>
+ 
+       {sentiment && sentiment.themes.length > 0 && (
+         <div className="mb-4 flex flex-wrap gap-2">
+           {sentiment.themes.map((theme) => (
+-            <span key={theme} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-[#8b949e]">
++            <Badge key={theme} variant="neutral">
+               {theme}
+-            </span>
++            </Badge>
+           ))}
+         </div>
+       )}
+ 
+       {rawNews.length === 0 ? (
+-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-[#8b949e]">
+-          No news articles available — either NEWSAPI_KEY isn&apos;t configured or no recent coverage was found.
+-          Sentiment defaults to neutral without news data.
++        <div className="rounded-md border border-dashed border-border p-4 text-sm text-foreground-muted">
++          No news articles available — either the news source isn&apos;t configured or no recent coverage was
++          found. Sentiment defaults to neutral without news data.
+         </div>
+       ) : (
+-        <div className="space-y-3">
++        <ul className="space-y-2">
+           {rawNews.map((article, index) => {
+             const articleSentiment = perArticleByIndex.get(index) ?? "neutral";
+             return (
+-              <a
+-                key={article.url}
+-                href={article.url}
+-                target="_blank"
+-                rel="noreferrer"
+-                className="block rounded-2xl border border-white/8 bg-white/5 p-3 transition hover:border-white/20"
+-              >
+-                <div className="flex items-start gap-2">
+-                  <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${perArticleDot[articleSentiment]}`} />
+-                  <div className="text-sm font-medium text-[#e6edf3]">{article.title}</div>
+-                </div>
+-                <div className="mt-1 pl-4 text-sm text-[#8b949e]">{article.source}</div>
+-              </a>
++              <li key={article.url}>
++                <a
++                  href={article.url}
++                  target="_blank"
++                  rel="noreferrer"
++                  className="group flex items-start gap-3 rounded-md border border-border bg-white/[0.02] p-3 transition-colors hover:border-border-strong"
++                >
++                  <StatusIndicator level={sentimentLevel[articleSentiment] ?? "neutral"} className="mt-0.5" />
++                  <div className="min-w-0 flex-1">
++                    <div className="flex items-start justify-between gap-2">
++                      <span className="text-sm font-medium leading-6 text-foreground">{article.title}</span>
++                      <ExternalLink
++                        className="mt-1 h-3.5 w-3.5 shrink-0 text-foreground-faint opacity-0 transition-opacity group-hover:opacity-100"
++                        aria-hidden="true"
++                      />
++                    </div>
++                    <div className="mt-0.5 text-xs text-foreground-muted">{article.source}</div>
++                    <span className="sr-only"> (opens in a new tab)</span>
++                  </div>
++                </a>
++              </li>
+             );
+           })}
+-        </div>
++        </ul>
+       )}
+ 
+       {sentiment && (
+-        <div className="mt-5 rounded-2xl border border-white/8 bg-[#161b22]/70 p-4 text-sm leading-7 text-[#8b949e]">
++        <p className="mt-5 rounded-md border border-border bg-surface-elevated p-4 text-sm leading-7 text-foreground-muted">
+           {sentiment.analysis}
+-        </div>
++        </p>
+       )}
+-    </section>
++    </Card>
+   );
+ }
+diff --git a/frontend/src/components/pipeline-timeline.tsx b/frontend/src/components/pipeline-timeline.tsx
+index 02305f2..fbe9c4a 100644
+--- a/frontend/src/components/pipeline-timeline.tsx
++++ b/frontend/src/components/pipeline-timeline.tsx
+@@ -1,5 +1,9 @@
+-import { CheckCircle2, Circle, Loader2, XCircle } from "lucide-react";
++"use client";
++
++import { AnimatePresence, motion } from "framer-motion";
++import { Check, Loader2, X } from "lucide-react";
+ import { STEP_ORDER, type StepId, type StepState } from "@/lib/use-research-stream";
++import { cn } from "@/lib/utils";
+ 
+ interface PipelineTimelineProps {
+   steps: Record<StepId, StepState>;
+@@ -10,32 +14,44 @@ interface PipelineTimelineProps {
+  *
+  * Deliberately only reacts to the server's explicit failed: true flag for
+  * red/crashed styling. A pipeline that completes normally with decision
+- * PASS still shows all-green checkmarks here — PASS is a legitimate
+- * outcome of the scoring engine, not a failure, and the verdict banner
+- * (not this timeline) is the right place to communicate "PASS, low
+- * confidence" to the user without borrowing error styling for it.
++ * PASS still shows all-green checkmarks — PASS is a legitimate scoring
++ * outcome, not a failure.
+  */
+ export function PipelineTimeline({ steps }: PipelineTimelineProps) {
+   return (
+-    <ol className="flex flex-col gap-2">
+-      {STEP_ORDER.map((stepId) => {
++    <ol className="flex flex-col gap-1">
++      {STEP_ORDER.map((stepId, index) => {
+         const step = steps[stepId];
++        const isLast = index === STEP_ORDER.length - 1;
+         return (
+-          <li key={stepId} className="flex items-center gap-3 text-sm">
+-            <StepIcon status={step.status} failed={step.failed} />
+-            <span
+-              className={
+-                step.failed
+-                  ? "text-red-400"
+-                  : step.status === "done"
+-                    ? "text-neutral-200"
++          <li key={stepId} className="relative flex gap-3">
++            <div className="flex flex-col items-center">
++              <StepIcon status={step.status} failed={step.failed} />
++              {!isLast && (
++                <div
++                  className={cn(
++                    "my-1 w-px flex-1 transition-colors duration-300",
++                    step.status === "done" ? "bg-accent/40" : "bg-border"
++                  )}
++                />
++              )}
++            </div>
++            <div className="pb-4">
++              <span
++                className={cn(
++                  "text-sm transition-colors duration-200",
++                  step.failed
++                    ? "text-negative"
++                    : step.status === "done"
++                    ? "text-foreground"
+                     : step.status === "running"
+-                      ? "text-amber-300"
+-                      : "text-neutral-600"
+-              }
+-            >
+-              {step.label}
+-            </span>
++                    ? "text-accent"
++                    : "text-foreground-faint"
++                )}
++              >
++                {step.label}
++              </span>
++            </div>
+           </li>
+         );
+       })}
+@@ -44,10 +60,33 @@ export function PipelineTimeline({ steps }: PipelineTimelineProps) {
+ }
+ 
+ function StepIcon({ status, failed }: { status: StepState["status"]; failed: boolean }) {
+-  if (failed) return <XCircle className="h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />;
+-  if (status === "running") {
+-    return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-500" aria-hidden="true" />;
+-  }
+-  if (status === "done") return <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" aria-hidden="true" />;
+-  return <Circle className="h-4 w-4 shrink-0 text-neutral-700" aria-hidden="true" />;
++  return (
++    <span
++      className={cn(
++        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-200",
++        failed
++          ? "border-negative bg-negative-muted"
++          : status === "done"
++          ? "border-accent bg-accent"
++          : status === "running"
++          ? "border-accent/60 bg-accent-muted"
++          : "border-border bg-transparent"
++      )}
++    >
++      <AnimatePresence mode="wait" initial={false}>
++        {failed ? (
++          <motion.span key="failed" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
++            <X className="h-3 w-3 text-negative" aria-hidden="true" />
++          </motion.span>
++        ) : status === "done" ? (
++          <motion.span key="done" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
++            <Check className="h-3 w-3 text-white" aria-hidden="true" />
++          </motion.span>
++        ) : status === "running" ? (
++          <Loader2 className="h-3 w-3 animate-spin text-accent" aria-hidden="true" />
++        ) : null}
++      </AnimatePresence>
++      <span className="sr-only">{failed ? "Failed" : status}</span>
++    </span>
++  );
+ }
+diff --git a/frontend/src/components/price-chart.tsx b/frontend/src/components/price-chart.tsx
+index 40a326e..b4a001d 100644
+--- a/frontend/src/components/price-chart.tsx
++++ b/frontend/src/components/price-chart.tsx
+@@ -3,20 +3,46 @@
+ import { useEffect, useRef, useState } from "react";
+ import { createChart, ColorType, CandlestickSeries, LineSeries, type UTCTimestamp } from "lightweight-charts";
+ import type { ResearchReport } from "@/agents/types";
++import { Card, CardLabel, CardTitle } from "@/components/ui/card";
++import { Badge } from "@/components/ui/badge";
++import { Skeleton } from "@/components/ui/skeleton";
+ 
+ interface PriceChartProps {
+   report: ResearchReport;
+ }
+ 
++/**
++ * Resolved hex values of the design tokens in globals.css. lightweight-charts
++ * renders to <canvas>, so CSS custom properties can't be read directly here —
++ * if a token color changes in globals.css, these need the matching hex
++ * updated manually.
++ */
++const CHART_COLORS = {
++  surface: "#0d1117",
++  textMuted: "#9ca3af",
++  gridLine: "rgba(255,255,255,0.05)",
++  axisBorder: "rgba(255,255,255,0.1)",
++  positive: "#34d399",
++  negative: "#f87171",
++  warning: "#fbbf24",
++  accent: "#5b7cf0",
++};
++
+ /**
+  * price-chart.tsx
+  *
+- * Renders report.candles — real OHLCV history fetched from Yahoo Finance —
+- * never mock/placeholder data. If history failed to fetch (Yahoo down, or
+- * this ticker has no history), candles is an empty array and we show an
+- * explicit "no history available" state instead of fabricating a chart.
+- * Support/resistance/SMA overlay lines are derived from report.technicals
+- * (already computed server-side), not invented client-side.
++ * Renders report.candles — real OHLCV history from Yahoo Finance — never
++ * mock data. If history is unavailable, candles is empty and we show an
++ * explicit empty state instead of fabricating a chart. Support/resistance/
++ * SMA overlays come from report.technicals (server-computed), drawn as flat
++ * reference lines since technicals only gives a single current value, not a
++ * historical series.
++ *
++ * Mobile bug fix: the chart used to get a hardcoded height: 400 in JS
++ * regardless of its actual CSS container height (280px on mobile). It now
++ * reads the container's real clientHeight on mount, and the ResizeObserver
++ * syncs both width AND height (it previously only synced width), so the
++ * canvas can never outgrow its box again.
+  */
+ export function PriceChart({ report }: PriceChartProps) {
+   const containerRef = useRef<HTMLDivElement | null>(null);
+@@ -26,29 +52,31 @@ export function PriceChart({ report }: PriceChartProps) {
+   useEffect(() => {
+     if (!containerRef.current || candles.length === 0) return;
+ 
++    setIsReady(false);
++
+     const chart = createChart(containerRef.current, {
+       width: containerRef.current.clientWidth,
+-      height: 400,
++      height: containerRef.current.clientHeight,
+       layout: {
+-        background: { type: ColorType.Solid, color: "#0d1117" },
+-        textColor: "#e6edf3",
+-        fontFamily: "IBM Plex Mono, monospace",
++        background: { type: ColorType.Solid, color: CHART_COLORS.surface },
++        textColor: CHART_COLORS.textMuted,
++        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+       },
+       grid: {
+-        vertLines: { color: "rgba(255,255,255,0.05)" },
+-        horzLines: { color: "rgba(255,255,255,0.05)" },
++        vertLines: { color: CHART_COLORS.gridLine },
++        horzLines: { color: CHART_COLORS.gridLine },
+       },
+-      rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" },
+-      timeScale: { borderColor: "rgba(255,255,255,0.1)" },
++      rightPriceScale: { borderColor: CHART_COLORS.axisBorder },
++      timeScale: { borderColor: CHART_COLORS.axisBorder },
+       crosshair: { mode: 0 },
+     });
+ 
+     const candleSeries = chart.addSeries(CandlestickSeries, {
+-      upColor: "#3fb950",
+-      downColor: "#f85149",
++      upColor: CHART_COLORS.positive,
++      downColor: CHART_COLORS.negative,
+       borderVisible: false,
+-      wickUpColor: "#3fb950",
+-      wickDownColor: "#f85149",
++      wickUpColor: CHART_COLORS.positive,
++      wickDownColor: CHART_COLORS.negative,
+     });
+ 
+     const data = candles.map((item) => ({
+@@ -60,16 +88,12 @@ export function PriceChart({ report }: PriceChartProps) {
+     }));
+     candleSeries.setData(data);
+ 
+-    // Technicals only give us a single current support/resistance/SMA value
+-    // (not a full historical series), so overlays are drawn as flat
+-    // reference lines across the visible range rather than fabricated
+-    // per-point curves. Omitted entirely when a level is null.
+     const { support, resistance, sma50: sma50Value, sma200: sma200Value } = report.technicals;
+     const firstTime = data[0]?.time;
+     const lastTime = data[data.length - 1]?.time;
+ 
+     if (support !== null && firstTime !== undefined && lastTime !== undefined) {
+-      const supportLine = chart.addSeries(LineSeries, { color: "#3fb950", lineWidth: 2, lineStyle: 2 });
++      const supportLine = chart.addSeries(LineSeries, { color: CHART_COLORS.positive, lineWidth: 2, lineStyle: 2 });
+       supportLine.setData([
+         { time: firstTime, value: support },
+         { time: lastTime, value: support },
+@@ -77,7 +101,7 @@ export function PriceChart({ report }: PriceChartProps) {
+     }
+ 
+     if (resistance !== null && firstTime !== undefined && lastTime !== undefined) {
+-      const resistanceLine = chart.addSeries(LineSeries, { color: "#f85149", lineWidth: 2, lineStyle: 2 });
++      const resistanceLine = chart.addSeries(LineSeries, { color: CHART_COLORS.negative, lineWidth: 2, lineStyle: 2 });
+       resistanceLine.setData([
+         { time: firstTime, value: resistance },
+         { time: lastTime, value: resistance },
+@@ -85,7 +109,7 @@ export function PriceChart({ report }: PriceChartProps) {
+     }
+ 
+     if (sma50Value !== null && firstTime !== undefined && lastTime !== undefined) {
+-      const sma50 = chart.addSeries(LineSeries, { color: "#d29922", lineWidth: 2 });
++      const sma50 = chart.addSeries(LineSeries, { color: CHART_COLORS.warning, lineWidth: 2 });
+       sma50.setData([
+         { time: firstTime, value: sma50Value },
+         { time: lastTime, value: sma50Value },
+@@ -93,7 +117,7 @@ export function PriceChart({ report }: PriceChartProps) {
+     }
+ 
+     if (sma200Value !== null && firstTime !== undefined && lastTime !== undefined) {
+-      const sma200 = chart.addSeries(LineSeries, { color: "#58a6ff", lineWidth: 2 });
++      const sma200 = chart.addSeries(LineSeries, { color: CHART_COLORS.accent, lineWidth: 2 });
+       sma200.setData([
+         { time: firstTime, value: sma200Value },
+         { time: lastTime, value: sma200Value },
+@@ -102,7 +126,10 @@ export function PriceChart({ report }: PriceChartProps) {
+ 
+     const resizeObserver = new ResizeObserver((entries) => {
+       for (const entry of entries) {
+-        chart.applyOptions({ width: entry.contentRect.width });
++        chart.applyOptions({
++          width: entry.contentRect.width,
++          height: entry.contentRect.height,
++        });
+       }
+     });
+     resizeObserver.observe(containerRef.current);
+@@ -115,33 +142,38 @@ export function PriceChart({ report }: PriceChartProps) {
+   }, [report.symbol, candles, report.technicals]);
+ 
+   return (
+-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
++    <Card>
+       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+         <div>
+-          <div className="text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Price action</div>
+-          <div className="mt-1 text-lg font-semibold text-[#e6edf3]">{report.companyName} · ~1Y view</div>
++          <CardLabel>Price action</CardLabel>
++          <CardTitle>
++            {report.companyName} · ~1Y view
++          </CardTitle>
+         </div>
+         {candles.length > 0 && (
+-          <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.25em] text-[#8b949e]">
+-            <span className="rounded-full border border-[#3fb950]/20 bg-[#3fb950]/10 px-2.5 py-1">Support</span>
+-            <span className="rounded-full border border-[#f85149]/20 bg-[#f85149]/10 px-2.5 py-1">Resistance</span>
+-            <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2.5 py-1">SMA 50</span>
+-            <span className="rounded-full border border-[#58a6ff]/20 bg-[#58a6ff]/10 px-2.5 py-1">SMA 200</span>
++          <div className="flex flex-wrap gap-2">
++            <Badge variant="positive">Support</Badge>
++            <Badge variant="negative">Resistance</Badge>
++            <Badge variant="warning">SMA 50</Badge>
++            <Badge variant="accent">SMA 200</Badge>
+           </div>
+         )}
+       </div>
+ 
+       {candles.length === 0 ? (
+-        <div className="flex h-[240px] w-full items-center justify-center rounded-2xl border border-dashed border-white/10 text-center text-sm text-[#8b949e]">
+-          Price history is unavailable for this symbol right now — the chart is skipped rather than showing
+-          placeholder data.
++        <div className="flex h-[240px] w-full items-center justify-center rounded-md border border-dashed border-border text-center text-sm text-foreground-muted">
++          Price history is unavailable for this symbol right now.
+         </div>
+       ) : (
+-        <>
+-          <div ref={containerRef} className="h-[280px] w-full sm:h-[400px]" />
+-          {!isReady && <div className="mt-2 text-sm text-[#8b949e]">Preparing chart…</div>}
+-        </>
++        <div className="relative h-[280px] w-full sm:h-[400px]">
++          {!isReady && (
++            <div className="absolute inset-0 p-1">
++              <Skeleton className="h-full w-full" />
++            </div>
++          )}
++          <div ref={containerRef} className="h-full w-full" />
++        </div>
+       )}
+-    </section>
++    </Card>
+   );
+ }
+diff --git a/frontend/src/components/reasoning.tsx b/frontend/src/components/reasoning.tsx
+index 87809a1..51fefb5 100644
+--- a/frontend/src/components/reasoning.tsx
++++ b/frontend/src/components/reasoning.tsx
+@@ -1,5 +1,8 @@
+ "use client";
+ 
++import { NotebookText } from "lucide-react";
++import { Card, CardLabel } from "@/components/ui/card";
++
+ interface ReasoningProps {
+   memo: string;
+ }
+@@ -8,15 +11,18 @@ export function Reasoning({ memo }: ReasoningProps) {
+   const paragraphs = memo.split(/\n\n+/).filter(Boolean);
+ 
+   return (
+-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
+-      <div className="mb-4 text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Investment memo</div>
+-      <div className="space-y-4 text-sm leading-8 text-[#8b949e]">
++    <Card>
++      <div className="flex items-center gap-2">
++        <NotebookText className="h-4 w-4 text-accent" aria-hidden="true" />
++        <CardLabel>Investment memo</CardLabel>
++      </div>
++      <div className="mt-4 space-y-4 text-sm leading-7 text-foreground-muted">
+         {paragraphs.length > 0 ? (
+-          paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
++          paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+         ) : (
+           <p>No reasoning memo was provided for this report.</p>
+         )}
+       </div>
+-    </section>
++    </Card>
+   );
+ }
+diff --git a/frontend/src/components/risk-cards.tsx b/frontend/src/components/risk-cards.tsx
+index 333a2cd..4820319 100644
+--- a/frontend/src/components/risk-cards.tsx
++++ b/frontend/src/components/risk-cards.tsx
+@@ -1,71 +1,85 @@
+ "use client";
+ 
+ import type { ResearchReport } from "@/agents/types";
++import { Card, CardLabel, CardTitle } from "@/components/ui/card";
++import { Badge } from "@/components/ui/badge";
++import { cn } from "@/lib/utils";
+ 
+ interface RiskCardsProps {
+   report: ResearchReport;
+ }
+ 
+-/**
+- * risk-cards.tsx
+- *
+- * Renders report.risks (real risk factors from synthesize.ts, or the
+- * "Synthesis unavailable" placeholder risk if that LLM call failed) plus
+- * the deterministic risk score from report.verdict.scores.risk — never
+- * hardcoded sample risks.
+- */
+-
+ const severityLabel: Record<string, string> = { h: "High", m: "Medium", l: "Low" };
+ 
+-const severityStyles: Record<string, string> = {
+-  h: "border-[#f85149]/40 bg-[#f85149]/10 text-[#f85149]",
+-  m: "border-amber-400/30 bg-amber-500/10 text-amber-300",
+-  l: "border-[#3fb950]/20 bg-[#3fb950]/10 text-[#3fb950]",
++const severityClass: Record<string, string> = {
++  h: "border-negative/25 bg-negative-muted",
++  m: "border-warning/25 bg-warning-muted",
++  l: "border-positive/20 bg-positive-muted",
++};
++
++const severityTextClass: Record<string, string> = {
++  h: "text-negative",
++  m: "text-warning",
++  l: "text-positive",
+ };
+ 
++/**
++ * risk-cards.tsx
++ *
++ * Renders report.risks (real risk factors from the synthesis step, or the
++ * "Synthesis unavailable" placeholder risk if that call failed) plus the
++ * deterministic risk score — never hardcoded sample risks. Severity maps
++ * consistently to the same positive/warning/negative tokens used
++ * everywhere else in the app, instead of its own one-off palette.
++ */
+ export function RiskCards({ report }: RiskCardsProps) {
+   const { risks, riskAnalysis } = report;
+   // verdict.scores.risk is 0-100 (high = low risk); display as an X/10
+-  // risk level for readability, inverted back so higher = riskier.
++  // risk level for readability, inverted so higher = riskier.
+   const riskOutOf10 = Math.round((100 - report.verdict.scores.risk) / 10);
+ 
+   return (
+-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
++    <Card>
+       <div className="mb-4 flex items-center justify-between gap-3">
+         <div>
+-          <div className="text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Risk profile</div>
+-          <div className="mt-1 text-lg font-semibold text-[#e6edf3]">{report.companyName}</div>
++          <CardLabel>Risk profile</CardLabel>
++          <CardTitle>{report.companyName}</CardTitle>
+         </div>
+-        <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-medium text-[#8b949e]">
++        <Badge variant="neutral" className="font-mono tabular-nums">
+           {riskOutOf10}/10
+-        </div>
++        </Badge>
+       </div>
+ 
+       {risks.length === 0 ? (
+-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-[#8b949e]">
++        <div className="rounded-md border border-dashed border-border p-4 text-sm text-foreground-muted">
+           No specific risk factors were identified for this report.
+         </div>
+       ) : (
+         <div className="space-y-3">
+           {risks.map((item) => (
+-            <div key={item.name} className={`rounded-2xl border p-4 ${severityStyles[item.severity]}`}>
++            <div key={item.name} className={cn("rounded-md border p-4", severityClass[item.severity])}>
+               <div className="flex items-center justify-between gap-3">
+-                <div className="font-medium text-[#e6edf3]">{item.name}</div>
+-                <span className="rounded-full border border-current/20 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.25em]">
++                <div className="font-medium text-foreground">{item.name}</div>
++                <span
++                  className={cn(
++                    "rounded-full border border-current/25 px-2.5 py-0.5 text-xs font-medium uppercase tracking-label",
++                    severityTextClass[item.severity]
++                  )}
++                >
+                   {severityLabel[item.severity]}
+                 </span>
+               </div>
+-              <div className="mt-2 text-sm leading-6 text-[#8b949e]">{item.detail}</div>
++              <div className="mt-2 text-sm leading-6 text-foreground-muted">{item.detail}</div>
+             </div>
+           ))}
+         </div>
+       )}
+ 
+       {riskAnalysis && (
+-        <div className="mt-4 rounded-2xl border border-white/8 bg-[#161b22]/70 p-4 text-sm leading-7 text-[#8b949e]">
++        <p className="mt-4 rounded-md border border-border bg-surface-elevated p-4 text-sm leading-7 text-foreground-muted">
+           {riskAnalysis}
+-        </div>
++        </p>
+       )}
+-    </section>
++    </Card>
+   );
+ }
+diff --git a/frontend/src/components/score-radar.tsx b/frontend/src/components/score-radar.tsx
+index cfe2598..29780cd 100644
+--- a/frontend/src/components/score-radar.tsx
++++ b/frontend/src/components/score-radar.tsx
+@@ -2,6 +2,8 @@
+ 
+ import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
+ import type { ResearchReport } from "@/agents/types";
++import { Card, CardLabel } from "@/components/ui/card";
++import { Badge } from "@/components/ui/badge";
+ 
+ interface ScoreRadarProps {
+   report: ResearchReport;
+@@ -19,15 +21,15 @@ export function ScoreRadar({ report }: ScoreRadarProps) {
+   ];
+ 
+   return (
+-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
++    <Card>
+       <div className="mb-4 flex items-end justify-between gap-3">
+         <div>
+-          <div className="text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">Score radar</div>
+-          <div className="mt-1 text-2xl font-semibold text-[#e6edf3]">{Math.round(scores.weighted)}/100</div>
+-        </div>
+-        <div className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-amber-300">
+-          Weighted score
++          <CardLabel>Score radar</CardLabel>
++          <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground">
++            {Math.round(scores.weighted)}/100
++          </div>
+         </div>
++        <Badge variant="accent">Weighted score</Badge>
+       </div>
+ 
+       <div className="h-[280px]">
+@@ -36,19 +38,13 @@ export function ScoreRadar({ report }: ScoreRadarProps) {
+             <PolarGrid stroke="rgba(255,255,255,0.08)" />
+             <PolarAngleAxis
+               dataKey="subject"
+-              tick={{ fill: "#8b949e", fontSize: 11, fontFamily: "IBM Plex Mono, monospace" }}
++              tick={{ fill: "#9ca3af", fontSize: 11, fontFamily: "ui-monospace, monospace" }}
+             />
+             <PolarRadiusAxis angle={20} domain={[0, 100]} tick={false} axisLine={false} />
+-            <Radar
+-              dataKey="value"
+-              stroke="#d29922"
+-              fill="#d29922"
+-              fillOpacity={0.15}
+-              strokeWidth={2}
+-            />
++            <Radar dataKey="value" stroke="#5b7cf0" fill="#5b7cf0" fillOpacity={0.15} strokeWidth={2} />
+           </RadarChart>
+         </ResponsiveContainer>
+       </div>
+-    </section>
++    </Card>
+   );
+ }
+diff --git a/frontend/src/components/search-bar.tsx b/frontend/src/components/search-bar.tsx
+index 5b08537..347c9f5 100644
+--- a/frontend/src/components/search-bar.tsx
++++ b/frontend/src/components/search-bar.tsx
+@@ -1,6 +1,9 @@
+ "use client";
+ 
+ import { useState, type FormEvent } from "react";
++import { Search } from "lucide-react";
++import { Button } from "@/components/ui/button";
++import { cn } from "@/lib/utils";
+ 
+ interface SearchBarProps {
+   onSearch: (companyName: string) => void;
+@@ -27,24 +30,31 @@ export function SearchBar({ onSearch, disabled }: SearchBarProps) {
+   }
+ 
+   return (
+-    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-2 sm:flex-row">
+-      <input
+-        type="text"
+-        value={value}
+-        onChange={(event) => setValue(event.target.value)}
+-        disabled={disabled}
+-        maxLength={MAX_LENGTH}
+-        placeholder="Company name or ticker (e.g. Apple, AAPL)"
+-        aria-label="Company name or ticker"
+-        className="text-base flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-4 py-3 text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+-      />
+-      <button
+-        type="submit"
+-        disabled={disabled || !trimmed}
+-        className="rounded-md bg-amber-600 px-5 py-3 font-medium text-neutral-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+-      >
++    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-3 sm:flex-row">
++      <div className="relative flex-1">
++        <Search
++          className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-foreground-faint"
++          aria-hidden="true"
++        />
++        <input
++          type="text"
++          value={value}
++          onChange={(event) => setValue(event.target.value)}
++          disabled={disabled}
++          maxLength={MAX_LENGTH}
++          placeholder="Company name or ticker — try Apple, NVDA, Infosys…"
++          aria-label="Company name or ticker"
++          className={cn(
++            "h-14 w-full rounded-md border border-border bg-surface pl-11 pr-4 text-base text-foreground",
++            "placeholder:text-foreground-faint",
++            "transition-colors focus:border-accent/50 focus:outline-none",
++            "disabled:cursor-not-allowed disabled:opacity-50"
++          )}
++        />
++      </div>
++      <Button type="submit" size="lg" disabled={disabled || !trimmed} className="sm:w-40">
+         {disabled ? "Researching…" : "Research"}
+-      </button>
++      </Button>
+     </form>
+   );
+ }
+diff --git a/frontend/src/components/search-history.tsx b/frontend/src/components/search-history.tsx
+index add6374..ddfe4e9 100644
+--- a/frontend/src/components/search-history.tsx
++++ b/frontend/src/components/search-history.tsx
+@@ -1,6 +1,9 @@
+ "use client";
+ 
+ import { useEffect, useState } from "react";
++import { History } from "lucide-react";
++import { StatusIndicator, type StatusLevel } from "@/components/ui/status-indicator";
++import { cn } from "@/lib/utils";
+ 
+ const STORAGE_KEY = "research-search-history";
+ const MAX_ENTRIES = 12;
+@@ -8,7 +11,7 @@ const MAX_ENTRIES = 12;
+ export interface SearchHistoryEntry {
+   companyName: string;
+   symbol: string | null;
+-  /** null covers both "still running" and "errored before a verdict existed" — rendered as a neutral dot either way. */
++  /** null covers both "still running" and "errored before a verdict existed" — rendered as neutral either way. */
+   decision: "INVEST" | "PASS" | null;
+   timestamp: string;
+ }
+@@ -21,7 +24,6 @@ export interface SearchHistoryEntry {
+  * rather than crash the page. Entries are deduped by company name
+  * (case-insensitive), most recent first, capped at 12.
+  */
+-
+ export function readSearchHistory(): SearchHistoryEntry[] {
+   if (typeof window === "undefined") return [];
+   try {
+@@ -53,6 +55,11 @@ interface SearchHistoryProps {
+   refreshKey: number;
+ }
+ 
++const decisionLevel: Record<string, StatusLevel> = {
++  INVEST: "positive",
++  PASS: "negative",
++};
++
+ export function SearchHistory({ onSelect, refreshKey }: SearchHistoryProps) {
+   const [entries, setEntries] = useState<SearchHistoryEntry[]>([]);
+ 
+@@ -63,26 +70,23 @@ export function SearchHistory({ onSelect, refreshKey }: SearchHistoryProps) {
+   if (entries.length === 0) return null;
+ 
+   return (
+-    <div className="flex flex-col gap-2">
+-      <h2 className="text-sm font-medium text-neutral-400">Recent searches</h2>
++    <div className="flex flex-col gap-3 border-t border-border pt-6">
++      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-label text-foreground-muted">
++        <History className="h-3.5 w-3.5" aria-hidden="true" />
++        Recent searches
++      </div>
+       <ul className="flex flex-wrap gap-2">
+         {entries.map((entry) => (
+           <li key={`${entry.companyName}-${entry.timestamp}`}>
+             <button
+               type="button"
+               onClick={() => onSelect(entry.companyName)}
+-              className="flex items-center gap-2 rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm text-neutral-200 transition hover:border-amber-600"
++              className={cn(
++                "flex items-center gap-2 rounded-full border border-border bg-white/[0.03] px-3 py-1.5 text-sm text-foreground-muted",
++                "transition-colors hover:border-accent/40 hover:text-foreground"
++              )}
+             >
+-              <span
+-                className={`h-2 w-2 rounded-full ${
+-                  entry.decision === "INVEST"
+-                    ? "bg-green-500"
+-                    : entry.decision === "PASS"
+-                      ? "bg-red-500"
+-                      : "bg-neutral-600"
+-                }`}
+-                aria-hidden="true"
+-              />
++              <StatusIndicator level={(entry.decision && decisionLevel[entry.decision]) || "neutral"} />
+               {entry.companyName}
+             </button>
+           </li>
+diff --git a/frontend/src/components/timeline.tsx b/frontend/src/components/timeline.tsx
+deleted file mode 100644
+index 5d70f7b..0000000
+--- a/frontend/src/components/timeline.tsx
++++ /dev/null
+@@ -1,52 +0,0 @@
+-"use client";
+-
+-import { CheckCircle2, Circle, Loader2, XCircle } from "lucide-react";
+-
+-export interface TimelineItem {
+-  id: string;
+-  label: string;
+-  status: "pending" | "running" | "done";
+-  failed?: boolean;
+-}
+-
+-interface TimelineProps {
+-  steps: TimelineItem[];
+-  title?: string;
+-}
+-
+-export function Timeline({ steps, title = "Research pipeline" }: TimelineProps) {
+-  return (
+-    <section className="rounded-[24px] border border-white/10 bg-[#0d1117]/80 p-5">
+-      <div className="mb-4 text-sm font-medium uppercase tracking-[0.3em] text-[#8b949e]">{title}</div>
+-      <ol className="space-y-3">
+-        {steps.map((step) => (
+-          <li key={step.id} className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+-            <div className="mt-0.5">
+-              {step.failed ? (
+-                <XCircle className="h-4 w-4 text-[#f85149]" />
+-              ) : step.status === "running" ? (
+-                <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+-              ) : step.status === "done" ? (
+-                <CheckCircle2 className="h-4 w-4 text-[#3fb950]" />
+-              ) : (
+-                <Circle className="h-4 w-4 text-[#484f58]" />
+-              )}
+-            </div>
+-            <div>
+-              <div className="font-mono text-sm text-[#e6edf3]">{step.label}</div>
+-              <div className="text-sm text-[#8b949e]">
+-                {step.failed
+-                  ? "Encountered an issue"
+-                  : step.status === "done"
+-                    ? "Completed"
+-                    : step.status === "running"
+-                      ? "In progress"
+-                      : "Queued"}
+-              </div>
+-            </div>
+-          </li>
+-        ))}
+-      </ol>
+-    </section>
+-  );
+-}
+diff --git a/frontend/src/components/ui/badge.tsx b/frontend/src/components/ui/badge.tsx
+new file mode 100644
+index 0000000..0f77bef
+--- /dev/null
++++ b/frontend/src/components/ui/badge.tsx
+@@ -0,0 +1,29 @@
++import { type HTMLAttributes } from "react";
++import { cva, type VariantProps } from "class-variance-authority";
++import { cn } from "@/lib/utils";
++
++const badgeVariants = cva(
++  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
++  {
++    variants: {
++      variant: {
++        neutral: "border-border bg-white/[0.03] text-foreground-muted",
++        accent: "border-accent/25 bg-accent-muted text-accent",
++        positive: "border-positive/25 bg-positive-muted text-positive",
++        negative: "border-negative/25 bg-negative-muted text-negative",
++        warning: "border-warning/25 bg-warning-muted text-warning",
++      },
++    },
++    defaultVariants: {
++      variant: "neutral",
++    },
++  }
++);
++
++export interface BadgeProps
++  extends HTMLAttributes<HTMLDivElement>,
++    VariantProps<typeof badgeVariants> {}
++
++export function Badge({ className, variant, ...props }: BadgeProps) {
++  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
++}
+diff --git a/frontend/src/components/ui/button.tsx b/frontend/src/components/ui/button.tsx
+new file mode 100644
+index 0000000..904799c
+--- /dev/null
++++ b/frontend/src/components/ui/button.tsx
+@@ -0,0 +1,43 @@
++import { forwardRef, type ButtonHTMLAttributes } from "react";
++import { cva, type VariantProps } from "class-variance-authority";
++import { cn } from "@/lib/utils";
++
++const buttonVariants = cva(
++  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50",
++  {
++    variants: {
++      variant: {
++        primary: "bg-accent text-white hover:bg-accent/90",
++        secondary: "border border-border bg-surface-elevated text-foreground hover:border-border-strong",
++        ghost: "text-foreground-muted hover:bg-white/5 hover:text-foreground",
++        pill: "rounded-full border border-border bg-white/[0.03] text-foreground-muted hover:border-accent/40 hover:text-accent",
++      },
++      size: {
++        sm: "h-8 px-3",
++        md: "h-10 px-4",
++        lg: "h-12 px-5 text-base",
++      },
++    },
++    defaultVariants: {
++      variant: "primary",
++      size: "md",
++    },
++  }
++);
++
++export interface ButtonProps
++  extends ButtonHTMLAttributes<HTMLButtonElement>,
++    VariantProps<typeof buttonVariants> {}
++
++export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
++  { className, variant, size, ...props },
++  ref
++) {
++  return (
++    <button
++      ref={ref}
++      className={cn(buttonVariants({ variant, size }), className)}
++      {...props}
++    />
++  );
++});
+diff --git a/frontend/src/components/ui/card.tsx b/frontend/src/components/ui/card.tsx
+new file mode 100644
+index 0000000..8c8516a
+--- /dev/null
++++ b/frontend/src/components/ui/card.tsx
+@@ -0,0 +1,45 @@
++import { type HTMLAttributes, forwardRef } from "react";
++import { cn } from "@/lib/utils";
++
++export interface CardProps extends HTMLAttributes<HTMLDivElement> {
++  /** Uses the third surface layer + shadow, for content that should sit above the page (verdict banner, confidence panel). */
++  elevated?: boolean;
++}
++
++export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
++  { className, elevated, ...props },
++  ref
++) {
++  return (
++    <div
++      ref={ref}
++      className={cn(
++        "rounded-md border border-border p-5",
++        elevated ? "bg-surface-elevated shadow-card" : "bg-surface",
++        className
++      )}
++      {...props}
++    />
++  );
++});
++
++export function CardLabel({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
++  return (
++    <div
++      className={cn(
++        "text-xs font-medium uppercase tracking-label text-foreground-muted",
++        className
++      )}
++      {...props}
++    />
++  );
++}
++
++export function CardTitle({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
++  return (
++    <div
++      className={cn("mt-1 text-lg font-semibold text-foreground", className)}
++      {...props}
++    />
++  );
++}
+diff --git a/frontend/src/components/ui/skeleton.tsx b/frontend/src/components/ui/skeleton.tsx
+new file mode 100644
+index 0000000..d9b4702
+--- /dev/null
++++ b/frontend/src/components/ui/skeleton.tsx
+@@ -0,0 +1,11 @@
++import { type HTMLAttributes } from "react";
++import { cn } from "@/lib/utils";
++
++export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
++  return (
++    <div
++      className={cn("animate-pulse rounded-sm bg-white/[0.05]", className)}
++      {...props}
++    />
++  );
++}
+diff --git a/frontend/src/components/ui/status-indicator.tsx b/frontend/src/components/ui/status-indicator.tsx
+new file mode 100644
+index 0000000..253276a
+--- /dev/null
++++ b/frontend/src/components/ui/status-indicator.tsx
+@@ -0,0 +1,28 @@
++import { AlertTriangle, CheckCircle2, MinusCircle, XCircle } from "lucide-react";
++import { cn } from "@/lib/utils";
++
++export type StatusLevel = "positive" | "warning" | "negative" | "neutral";
++
++const config: Record<StatusLevel, { icon: typeof CheckCircle2; className: string; label: string }> = {
++  positive: { icon: CheckCircle2, className: "text-positive", label: "Healthy" },
++  warning: { icon: AlertTriangle, className: "text-warning", label: "Watch" },
++  negative: { icon: XCircle, className: "text-negative", label: "Weak" },
++  neutral: { icon: MinusCircle, className: "text-foreground-faint", label: "N/A" },
++};
++
++/**
++ * status-indicator.tsx
++ *
++ * Replaces color-only dots (an accessibility issue for color-blind users
++ * flagged in the audit) with an icon + color pairing, so status reads even
++ * without color.
++ */
++export function StatusIndicator({ level, className }: { level: StatusLevel; className?: string }) {
++  const { icon: Icon, className: colorClass, label } = config[level];
++  return (
++    <span className={cn("inline-flex items-center", colorClass, className)}>
++      <Icon className="h-4 w-4" aria-hidden="true" />
++      <span className="sr-only">{label}</span>
++    </span>
++  );
++}
+diff --git a/frontend/src/components/verdict-banner.tsx b/frontend/src/components/verdict-banner.tsx
+index bd03853..4cc6b0c 100644
+--- a/frontend/src/components/verdict-banner.tsx
++++ b/frontend/src/components/verdict-banner.tsx
+@@ -1,77 +1,111 @@
+ "use client";
+ 
+-import { ArrowUpRight, BadgeDollarSign, Compass, TrendingUp } from "lucide-react";
++import { motion } from "framer-motion";
++import { Compass, LogIn, ShieldAlert, Target } from "lucide-react";
+ import type { ResearchReport } from "@/agents/types";
++import { Card } from "@/components/ui/card";
++import { Badge } from "@/components/ui/badge";
++import { cn } from "@/lib/utils";
+ 
+ interface VerdictBannerProps {
+   report: ResearchReport;
+ }
+ 
++/** report.verdict.decision is exactly "INVEST" | "PASS". */
+ export function VerdictBanner({ report }: VerdictBannerProps) {
+   const decision = report.verdict.decision;
+   const confidence = Math.max(0, Math.min(100, report.verdict.confidence));
+   const isInvest = decision === "INVEST";
+-  const accent = isInvest ? "#3fb950" : "#f85149";
+-  const badgeText = isInvest ? "Bullish signal" : "Risk-adjusted pass";
+ 
+   return (
+-    <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[#0d1117]/90 p-6 shadow-[0_20px_80px_rgba(0,0,0,0.3)] sm:p-8">
++    <Card elevated className="overflow-hidden">
+       <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+-        <div className="max-w-2xl space-y-5">
+-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-[#8b949e]">
+-            <Compass className="h-3.5 w-3.5" />
+-            {badgeText}
+-          </div>
++        <div className="max-w-2xl space-y-4">
++          <Badge variant={isInvest ? "positive" : "neutral"}>
++            <Compass className="h-3.5 w-3.5" aria-hidden="true" />
++            {isInvest ? "Bullish signal" : "Risk-adjusted pass"}
++          </Badge>
+ 
+           <div className="space-y-3">
+-            <div className="text-sm font-mono uppercase tracking-[0.3em] text-[#8b949e]">
++            <div className="font-mono text-sm uppercase tracking-label text-foreground-muted">
+               {report.companyName} · {report.symbol}
+             </div>
+-            <div className="text-5xl font-semibold tracking-[0.24em] text-[#e6edf3] sm:text-6xl">
++
++            <div
++              className={cn(
++                "inline-flex items-baseline gap-3 rounded-md border px-5 py-3",
++                isInvest ? "border-positive/30 bg-positive-muted" : "border-negative/30 bg-negative-muted"
++              )}
++            >
+               <span
+-                className="inline-block rounded-full border px-5 py-3 shadow-[0_0_40px_rgba(255,255,255,0.08)]"
+-                style={{ borderColor: `${accent}44`, boxShadow: `0 0 0 1px ${accent}33, 0 0 40px ${accent}22` }}
++                className={cn(
++                  "text-4xl font-semibold tracking-tight sm:text-5xl",
++                  isInvest ? "text-positive" : "text-negative"
++                )}
+               >
+                 {decision}
+               </span>
+             </div>
+-            <p className="max-w-xl text-base leading-7 text-[#8b949e]">
++
++            <p className="max-w-xl text-base leading-7 text-foreground-muted">
+               {report.verdict.reasoning || "The synthesis is available and the memo is being assembled."}
+             </p>
+           </div>
+         </div>
+ 
+-        <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#161b22]/90 p-5">
+-          <div className="mb-4 flex items-center justify-between text-sm text-[#8b949e]">
+-            <span className="font-mono uppercase tracking-[0.25em]">Confidence</span>
+-            <span className="font-semibold text-[#e6edf3]">{confidence}/100</span>
++        <Card className="w-full max-w-md p-5" elevated>
++          <div className="mb-3 flex items-center justify-between text-sm">
++            <span className="font-mono uppercase tracking-label text-foreground-muted">Confidence</span>
++            <span className="font-mono font-semibold tabular-nums text-foreground">{confidence}/100</span>
+           </div>
+-          <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+-            <div
+-              className="h-full rounded-full transition-all duration-700"
+-              style={{ width: `${confidence}%`, background: `linear-gradient(90deg, ${accent}, ${accent}CC)` }}
++
++          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
++            <motion.div
++              className={cn("h-full rounded-full", isInvest ? "bg-positive" : "bg-negative")}
++              initial={{ width: 0 }}
++              animate={{ width: `${confidence}%` }}
++              transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
+             />
+           </div>
+ 
+-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
+-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#e6edf3]">
+-              <BadgeDollarSign className="h-4 w-4 text-[#58a6ff]" />
+-              Entry {report.verdict.entryPrice ? `$${report.verdict.entryPrice.toFixed(2)}` : "N/A"}
+-            </div>
+-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#e6edf3]">
+-              <TrendingUp className="h-4 w-4 text-[#3fb950]" />
+-              Target {report.verdict.targetPrice ? `$${report.verdict.targetPrice.toFixed(2)}` : "N/A"}
+-            </div>
+-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#e6edf3]">
+-              <ArrowUpRight className="h-4 w-4 text-[#f85149]" />
+-              Stop {report.verdict.stopLoss ? `$${report.verdict.stopLoss.toFixed(2)}` : "N/A"}
+-            </div>
+-            <div className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-sm font-medium uppercase tracking-[0.25em] text-amber-300">
++          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
++            <PriceStat icon={LogIn} label="Entry" value={report.verdict.entryPrice} tone="neutral" />
++            <PriceStat icon={Target} label="Target" value={report.verdict.targetPrice} tone="positive" />
++            <PriceStat icon={ShieldAlert} label="Stop" value={report.verdict.stopLoss} tone="negative" />
++          </div>
++
++          <div className="mt-3">
++            <Badge variant="accent" className="capitalize">
+               {report.verdict.horizon ?? "medium-term"}
+-            </div>
++            </Badge>
+           </div>
++        </Card>
++      </div>
++    </Card>
++  );
++}
++
++function PriceStat({
++  icon: Icon,
++  label,
++  value,
++  tone,
++}: {
++  icon: typeof Target;
++  label: string;
++  value: number | null;
++  tone: "neutral" | "positive" | "negative";
++}) {
++  const toneClass = tone === "positive" ? "text-positive" : tone === "negative" ? "text-negative" : "text-accent";
++  return (
++    <div className="flex items-center gap-2 rounded-md border border-border bg-white/[0.02] px-3 py-2">
++      <Icon className={cn("h-4 w-4 shrink-0", toneClass)} aria-hidden="true" />
++      <div className="leading-tight">
++        <div className="text-xs text-foreground-faint">{label}</div>
++        <div className="font-mono text-sm tabular-nums text-foreground">
++          {value !== null ? `$${value.toFixed(2)}` : "N/A"}
+         </div>
+       </div>
+-    </section>
++    </div>
+   );
+ }
+diff --git a/frontend/src/lib/utils.ts b/frontend/src/lib/utils.ts
+new file mode 100644
+index 0000000..3ad9281
+--- /dev/null
++++ b/frontend/src/lib/utils.ts
+@@ -0,0 +1,7 @@
++import { clsx, type ClassValue } from "clsx";
++import { twMerge } from "tailwind-merge";
++
++/** Merge Tailwind classes with proper override precedence. */
++export function cn(...inputs: ClassValue[]) {
++  return twMerge(clsx(inputs));
++}
+diff --git a/frontend/tailwind.config.ts b/frontend/tailwind.config.ts
+index 866574f..7b93289 100644
+--- a/frontend/tailwind.config.ts
++++ b/frontend/tailwind.config.ts
+@@ -1,12 +1,73 @@
+ import type { Config } from "tailwindcss";
+ 
++/**
++ * tailwind.config.ts
++ *
++ * Every color used anywhere in the app maps to a CSS variable defined in
++ * globals.css — no new hardcoded hex values in components. Radius collapses
++ * to three tokens (sm/md/full) instead of picking arbitrary values per
++ * component. Letter-spacing for "label" text is 0.08em, not the
++ * tracking-[0.3em] the audit flagged as hurting legibility.
++ */
+ const config: Config = {
+   darkMode: "class",
+   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
+   theme: {
+     extend: {
+       fontFamily: {
+-        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
++        sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Inter", "sans-serif"],
++        mono: ["ui-monospace", "SFMono-Regular", "IBM Plex Mono", "Menlo", "monospace"],
++      },
++      colors: {
++        page: "var(--page)",
++        surface: "var(--surface)",
++        "surface-elevated": "var(--surface-elevated)",
++        border: {
++          DEFAULT: "var(--border)",
++          strong: "var(--border-strong)",
++        },
++        foreground: {
++          DEFAULT: "var(--fg-primary)",
++          muted: "var(--fg-muted)",
++          faint: "var(--fg-faint)",
++        },
++        accent: {
++          DEFAULT: "var(--accent)",
++          muted: "var(--accent-muted)",
++          foreground: "var(--accent-foreground)",
++        },
++        positive: {
++          DEFAULT: "var(--positive)",
++          muted: "var(--positive-muted)",
++        },
++        negative: {
++          DEFAULT: "var(--negative)",
++          muted: "var(--negative-muted)",
++        },
++        warning: {
++          DEFAULT: "var(--warning)",
++          muted: "var(--warning-muted)",
++        },
++      },
++      borderRadius: {
++        sm: "8px",
++        md: "16px",
++        full: "9999px",
++      },
++      letterSpacing: {
++        label: "0.08em",
++      },
++      boxShadow: {
++        card: "0 12px 40px rgba(0,0,0,0.35)",
++      },
++      keyframes: {
++        "fade-slide-up": {
++          "0%": { opacity: "0", transform: "translateY(8px)" },
++          "100%": { opacity: "1", transform: "translateY(0)" },
++        },
++      },
++      animation: {
++        "fade-slide-up": "fade-slide-up 0.2s ease-out both",
+       },
+     },
+   },
