@@ -63,6 +63,9 @@ Progress streams to the browser as NDJSON (one `{step, status, ...}` line per ev
 ## Example Runs
 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/fe657ba7-355e-4786-9d70-1e855fe5bc53" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/0e4eddbe-48bf-4967-a22b-4a3ed5473e4b" />
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/4e39fcd3-9630-4dfe-a039-a5d317a18932" />
 
 
 ## What I'd Improve With More Time
