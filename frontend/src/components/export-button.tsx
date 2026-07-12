@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type RefObject } from "react";
-import { Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { Button } from "@/components/ui/button";
 
 interface ExportButtonProps {
   reportRef: RefObject<HTMLElement>;
@@ -18,7 +19,9 @@ export function ExportButton({ reportRef }: ExportButtonProps) {
 
     setIsExporting(true);
     try {
-      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#06080e" });
+      // Matches --page from globals.css — html2canvas can't read CSS
+      // custom properties, so the background is passed explicitly.
+      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#07090d" });
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -36,13 +39,13 @@ export function ExportButton({ reportRef }: ExportButtonProps) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleExport}
-      className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-500/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.3em] text-amber-300 transition hover:bg-amber-500/20"
-    >
-      <Download className="h-4 w-4" />
+    <Button type="button" variant="secondary" size="sm" onClick={handleExport} disabled={isExporting}>
+      {isExporting ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <Download className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
       {isExporting ? "Generating…" : "Export PDF"}
-    </button>
+    </Button>
   );
 }

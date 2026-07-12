@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { Hero } from "@/components/hero";
 import { PipelineTimeline } from "@/components/pipeline-timeline";
 import { DataCoverageBadge } from "@/components/data-coverage-badge";
@@ -49,30 +51,37 @@ export default function HomePage() {
   const isRunning = phase === "running";
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-4 py-8 text-neutral-100 sm:px-6 sm:py-10 lg:px-8">
+    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-4 py-8 text-foreground sm:px-6 sm:py-10 lg:px-8">
       <Hero onSearch={run} disabled={isRunning} />
 
       {phase !== "idle" && (
-        <section className="flex flex-col gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+        <Card className="animate-fade-slide-up flex flex-col gap-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-sm text-neutral-300">{companyName}</span>
+            <span className="text-sm font-medium text-foreground">{companyName}</span>
             {dataSources.length > 0 && <DataCoverageBadge dataSources={dataSources} />}
           </div>
           <PipelineTimeline steps={steps} />
-        </section>
+        </Card>
       )}
 
       {phase === "error" && errorMessage && (
         <section
           role="alert"
-          className="rounded-lg border border-red-800 bg-red-950/40 p-4 text-sm text-red-300"
+          className="animate-fade-slide-up flex items-start gap-3 rounded-md border border-negative/25 bg-negative-muted p-4 text-sm text-negative"
         >
-          {errorMessage}
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-medium">Research couldn&apos;t be completed</p>
+            <p className="mt-1 text-negative/90">{errorMessage}</p>
+            <p className="mt-2 text-xs text-foreground-muted">
+              Try a different company name or ticker, or check the spelling and try again.
+            </p>
+          </div>
         </section>
       )}
 
       {phase === "done" && report && (
-        <div className="flex flex-col gap-6">
+        <div className="animate-fade-slide-up flex flex-col gap-6">
           <div className="flex justify-end">
             <ExportButton reportRef={reportRef} />
           </div>
