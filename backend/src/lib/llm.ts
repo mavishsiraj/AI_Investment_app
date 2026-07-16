@@ -1,5 +1,5 @@
 import { ChatOpenAI } from "@langchain/openai";
-import type { z } from "zod";
+import { z } from "zod";
 import type { BaseMessageLike } from "@langchain/core/messages";
 
 /**
@@ -168,12 +168,26 @@ export async function structuredCall<T extends z.ZodTypeAny>(
       lastError = error;
 
       const attemptsRemaining = retries - attempt;
-      if (attemptsRemaining <= 0 || !isRetryable(error)) {
+      const isSchemaError = error instanceof z.ZodError;
+
+      if (attemptsRemaining <= 0 || !(isRetryable(error) || isSchemaError)) {
         break;
       }
 
-      const delay = baseDelayMs * 2 ** attempt;
-      await sleep(delay, signal);
+      // On a schema validation failure, tell the model exactly what it got
+      // wrong instead of just resending the same prompt and hoping for a
+      // different roll. This is what actually fixes enum/shape mismatches —
+      // retrying the identical prompt against a small model tends to
+      // reproduce the same mistake.
+      if (isSchemaError) {
+        messages.push({
+          role: "user",
+          content: `Your previous response did not match the required schema:\n${error.message}\n\nReturn corrected output that strictly matches the schema. Pay close attention to any enum fields — only use the exact allowed values listed in the schema.`,
+        });
+      } else {
+        const delay = baseDelayMs * 2 ** attempt;
+        await sleep(delay, signal);
+      }
     }
   }
 
