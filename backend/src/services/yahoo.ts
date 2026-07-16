@@ -45,44 +45,38 @@ export async function resolveSymbol(companyName: string): Promise<string> {
 }
 
 export async function fetchProfile(symbol: string): Promise<CompanyProfile> {
-  const data = await yahooFinance.quoteSummary(symbol, {
-    modules: ["assetProfile", "price"],
-  });
+  const data = await yahooFinance.quote(symbol);
 
   return {
     symbol,
-    companyName: data.price?.longName ?? data.price?.shortName ?? symbol,
-    sector: data.assetProfile?.sector ?? null,
-    industry: data.assetProfile?.industry ?? null,
-    description: data.assetProfile?.longBusinessSummary ?? null,
-    website: data.assetProfile?.website ?? null,
-    employees: data.assetProfile?.fullTimeEmployees ?? null,
-    exchange: data.price?.exchangeName ?? null,
-    currency: data.price?.currency ?? null,
+    companyName: data.longName ?? data.shortName ?? symbol,
+    sector: null,
+    industry: null,
+    description: null,
+    website: null,
+    employees: null,
+    exchange: data.exchange ?? data.fullExchangeName ?? null,
+    currency: data.currency ?? null,
   };
 }
 
-export async function fetchRawFinancials(symbol: string): Promise<RawFinancials> {
-  const data = await yahooFinance.quoteSummary(symbol, {
-    modules: ["defaultKeyStatistics", "financialData", "summaryDetail"],
-  });
+  
 
-  const stats = data.defaultKeyStatistics;
-  const financialData = data.financialData;
-  const summary = data.summaryDetail;
+export async function fetchRawFinancials(symbol: string): Promise<RawFinancials> {
+  const data = await yahooFinance.quote(symbol);
 
   return {
-    trailingPE: summary?.trailingPE ?? null,
-    forwardPE: stats?.forwardPE ?? null,
-    revenueGrowth: financialData?.revenueGrowth ?? null,
-    earningsGrowth: financialData?.earningsGrowth ?? null,
-    debtToEquity: financialData?.debtToEquity ?? null,
-    marketCap: summary?.marketCap ?? null,
-    currentPrice: financialData?.currentPrice ?? null,
-    fiftyTwoWeekHigh: summary?.fiftyTwoWeekHigh ?? null,
-    fiftyTwoWeekLow: summary?.fiftyTwoWeekLow ?? null,
-    profitMargin: financialData?.profitMargins ?? null,
-    returnOnEquity: financialData?.returnOnEquity ?? null,
+    trailingPE: data.trailingPE ?? null,
+    forwardPE: data.forwardPE ?? null,
+    revenueGrowth: null,
+    earningsGrowth: null,
+    debtToEquity: null,
+    marketCap: data.marketCap ?? null,
+    currentPrice: data.regularMarketPrice ?? null,
+    fiftyTwoWeekHigh: data.fiftyTwoWeekHigh ?? null,
+    fiftyTwoWeekLow: data.fiftyTwoWeekLow ?? null,
+    profitMargin: null,
+    returnOnEquity: null,
   };
 }
 
