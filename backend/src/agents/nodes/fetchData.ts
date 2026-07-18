@@ -5,7 +5,7 @@ import {
   fetchRawFinancials,
   formatFinancials,
   fetchHistory,
-} from "../../services/yahoo.ts";
+} from "../../services/finnhub.ts";
 import { fetchNews } from "../../services/news.ts";
 import { computeTechnicals } from "../../services/technicals.ts";
 import type { ResearchState } from "../state.ts";
@@ -20,12 +20,14 @@ import type { ResearchState } from "../state.ts";
  * result afterward (it cannot run in true parallel — it depends on candles
  * — but is still counted as one of the 5 data sources per your spec).
  *
- * Change from previous version: accepts an optional RunnableConfig so
- * /api/research's AbortController can propagate here. Known limitation:
- * only fetchNews (via axios) actually honors the signal mid-request —
- * yahoo-finance2 doesn't document a supported cancellation mechanism, so
- * an in-flight Yahoo call will still complete; the signal is checked
- * up-front instead, so a request that hasn't started yet is skipped.
+ * Change from previous version: switched the data source from Yahoo
+ * Finance (yahoo-finance2, an unofficial scraper that Yahoo aggressively
+ * rate-limits from datacenter IPs like Render's) to Finnhub, a documented
+ * API with a real key. Since finnhub.ts's calls go through axios (like
+ * news.ts), the AbortSignal from /api/research's AbortController now
+ * propagates mid-request for every one of these calls, not just news —
+ * an in-flight request is actually cancelled instead of just left to
+ * complete after the signal fires.
  */
 
 function describeError(reason: unknown): string {
@@ -47,7 +49,7 @@ export async function fetchDataNode(
 
   let symbol: string;
   try {
-    symbol = await resolveSymbol(state.companyName);
+    symbol = await resolveSymbol(state.companyName, signal);
   } catch (error) {
     // resolveSymbol's error message is already the exact user-facing string
     // ("Could not find ticker for X. Try the exact company name or ticker
@@ -67,9 +69,9 @@ export async function fetchDataNode(
   }
 
   const [profileResult, rawFinancialsResult, historyResult, newsResult] = await Promise.allSettled([
-    fetchProfile(symbol),
-    fetchRawFinancials(symbol),
-    fetchHistory(symbol),
+    fetchProfile(symbol, signal),
+    fetchRawFinancials(symbol, signal),
+    fetchHistory(symbol, signal),
     fetchNews(state.companyName, signal),
   ]);
 
@@ -78,21 +80,21 @@ export async function fetchDataNode(
 
   const profile = profileResult.status === "fulfilled" ? profileResult.value : null;
   if (profileResult.status === "fulfilled") {
-    dataSources.push("yahoo-profile");
+    dataSources.push("finnhub-profile");
   } else {
     errors.push(`Profile fetch failed: ${describeError(profileResult.reason)}`);
   }
 
   const rawFinancials = rawFinancialsResult.status === "fulfilled" ? rawFinancialsResult.value : null;
   if (rawFinancialsResult.status === "fulfilled") {
-    dataSources.push("yahoo-financials");
+    dataSources.push("finnhub-financials");
   } else {
     errors.push(`Financials fetch failed: ${describeError(rawFinancialsResult.reason)}`);
   }
 
   const candles = historyResult.status === "fulfilled" ? historyResult.value : [];
   if (historyResult.status === "fulfilled" && candles.length > 0) {
-    dataSources.push("yahoo-history");
+    dataSources.push("finnhub-history");
   } else if (historyResult.status === "rejected") {
     errors.push(`History fetch failed: ${describeError(historyResult.reason)}`);
   } else {
