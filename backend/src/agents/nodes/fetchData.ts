@@ -4,8 +4,8 @@ import {
   fetchProfile,
   fetchRawFinancials,
   formatFinancials,
-  fetchHistory,
 } from "../../services/finnhub.ts";
+import { fetchHistory } from "../../services/twelvedata.ts";
 import { fetchNews } from "../../services/news.ts";
 import { computeTechnicals } from "../../services/technicals.ts";
 import type { ResearchState } from "../state.ts";
