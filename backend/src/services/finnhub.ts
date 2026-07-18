@@ -215,34 +215,9 @@ export function formatFinancials(raw: RawFinancials): FinancialMetrics {
  * history fetch by recording the error and continuing with an empty
  * candles array, so the rest of the report still renders normally.
  */
-export async function fetchHistory(symbol: string, signal?: AbortSignal): Promise<CandleData[]> {
-  const apiKey = requireApiKey();
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - 365 * 24 * 60 * 60;
-
-  const { data } = await client.get<{
-    s: string;
-    t?: number[];
-    o?: number[];
-    h?: number[];
-    l?: number[];
-    c?: number[];
-    v?: number[];
-  }>("/stock/candle", {
-    params: { symbol, resolution: "D", from, to, token: apiKey },
-    signal,
-  });
-
-  if (data.s !== "ok" || !data.t) {
-    throw new Error(`No candle data available for ${symbol} (status: ${data.s}).`);
-  }
-
-  return data.t.map((timestamp, i) => ({
-    date: new Date(timestamp * 1000).toISOString().slice(0, 10),
-    open: data.o![i],
-    high: data.h![i],
-    low: data.l![i],
-    close: data.c![i],
-    volume: data.v?.[i] ?? 0,
-  }));
-}
+/**
+ * NOTE: fetchHistory used to live here, hitting Finnhub's /stock/candle.
+ * That endpoint returns 403 on the free tier (paid-plan feature), so
+ * candle fetching moved to twelvedata.ts. Everything else (profile,
+ * financials, quote) stays on Finnhub since those work fine for free.
+ */
