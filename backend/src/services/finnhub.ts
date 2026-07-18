@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { CompanyProfile, RawFinancials, FinancialMetrics, CandleData } from "../agents/types.ts";
+import type { CompanyProfile, RawFinancials, FinancialMetrics} from "../agents/types.ts";
 
 /**
  * finnhub.ts
