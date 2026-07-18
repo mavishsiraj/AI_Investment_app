@@ -121,7 +121,7 @@ app.post('/api/research', async (req, res) => {
       data: { verdict: state.verdict },
     });
 
-    if (!state.profile || !state.financials || !state.technicals || !state.verdict) {
+   if (!state.profile || !state.financials || !state.verdict) {
       send({
         step: 'error',
         status: 'done',
