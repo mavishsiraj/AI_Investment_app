@@ -94,7 +94,7 @@ export async function fetchDataNode(
 
   const candles = historyResult.status === "fulfilled" ? historyResult.value : [];
   if (historyResult.status === "fulfilled" && candles.length > 0) {
-    dataSources.push("finnhub-history");
+    dataSources.push("twelvedata-history");
   } else if (historyResult.status === "rejected") {
     errors.push(`History fetch failed: ${describeError(historyResult.reason)}`);
   } else {
